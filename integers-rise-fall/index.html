@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Integers: Rise and Fall</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Everything is laid out on a fixed 1920×1080 stage (Figma frame size)
+       and scaled to fit the window by js/game.js → fitStage(). -->
+  <div id="viewport">
+    <div id="stage">
+
+      <!-- Background (Figma: "ChatGPT Image … 03_26_47 PM (2) 1") -->
+      <div id="bg"></div>
+
+      <!-- ============ NUMBER PLATE + KEYPAD (left) ============ -->
+      <div id="connector" class="hidden"></div>
+      <div id="panel" class="hidden">
+        <div id="keys">
+          <button class="key" data-k="1">1</button>
+          <button class="key" data-k="2">2</button>
+          <button class="key" data-k="3">3</button>
+          <button class="key key--sign" data-k="+">+</button>
+          <button class="key" data-k="4">4</button>
+          <button class="key" data-k="5">5</button>
+          <button class="key" data-k="6">6</button>
+          <button class="key key--sign" data-k="-">−</button>
+          <button class="key" data-k="7">7</button>
+          <button class="key" data-k="8">8</button>
+          <button class="key" data-k="9">9</button>
+          <button class="key" data-k="0">0</button>
+        </div>
+        <div id="padActions">
+          <button id="btnClear" class="pad-btn pad-btn--clear" aria-label="Clear">⌫</button>
+          <button id="btnCheck" class="pad-btn pad-btn--check">Check</button>
+        </div>
+      </div>
+      <div id="plate" class="hidden"><span id="plateText">0</span></div>
+
+      <!-- Equation (Level 2/3): sits on top of the keypad in level mode, beside the tank -->
+      <div id="eqPanel" class="hidden" aria-live="polite">
+        <span id="eqA"></span><span id="eqOp"></span><span id="eqB"></span><span id="eqEq">=</span><span id="eqAns">?</span>
+      </div>
+
+      <!-- ============ TANK + SCALE (right) ============ -->
+      <img id="pipeIn" class="pipe" src="assets/pipe-in-dry.png" alt="" draggable="false" />
+      <div id="water">
+        <div class="wave wave--back"></div>
+        <div class="wave wave--front"></div>
+        <div class="bubbles"></div>
+      </div>
+      <img id="tank" src="assets/tank-empty.png" alt="Water tank" draggable="false" />
+      <div id="glassShine"></div>
+      <img id="pipeOut" class="pipe" src="assets/pipe-out-dry.png" alt="" draggable="false" />
+
+      <div id="track"></div>
+      <div id="rail"></div>
+      <div id="scaleClip"><div id="scaleStrip"></div></div>
+      <div id="countLine"></div>
+
+      <button id="btnUp" class="lever-btn" aria-label="Move marker up"></button>
+      <button id="btnDown" class="lever-btn" aria-label="Move marker down"></button>
+
+      <div id="marker" role="slider" aria-label="Water level marker" tabindex="0">
+        <svg viewBox="0 0 140 40" width="140" height="40" aria-hidden="true">
+          <defs>
+            <filter id="mGlow" x="-30%" y="-80%" width="160%" height="260%">
+              <feGaussianBlur stdDeviation="3" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <g filter="url(#mGlow)">
+            <rect x="4" y="16" width="96" height="8" rx="4" fill="#FFE11A" />
+            <path d="M92 4 L132 20 L92 36 Z" fill="#FFE11A" stroke="#E0A800" stroke-width="2" stroke-linejoin="round" />
+          </g>
+        </svg>
+        <span class="marker-grip"></span>
+      </div>
+
+      <!-- ============ NARRATOR ============ -->
+      <img id="character" src="assets/guddu-full.png" alt="Guddu Bhaiya" draggable="false" />
+      <div id="banner">
+        <img id="avatar" src="assets/guddu-happy.png" alt="" draggable="false" />
+        <p id="bannerText"></p>
+      </div>
+
+      <!-- Transition gate button -->
+      <button id="gateBtn" class="big-btn hidden">Start</button>
+
+      <!-- ============ FOCUS LAYER (frosted glass + spotlight holes) ============ -->
+      <div id="focus"></div>
+      <div class="focus-ring" id="ring0"></div>
+      <div class="focus-ring" id="ring1"></div>
+
+      <!-- Tutorial demo hand -->
+      <div id="hand" aria-hidden="true">👆</div>
+
+      <!-- ============ FEEDBACK FX ============ -->
+      <div id="fxLayer"></div>
+      <div id="markedBadge"><span></span></div>
+      <canvas id="confetti" width="1920" height="1080"></canvas>
+
+      <!-- Level transition: the screen closes into a water drop -->
+      <div id="wipe" class="hidden"></div>
+      <img id="wipeDrop" class="hidden" src="assets/drop.png" alt="" draggable="false" />
+
+      <!-- ============ HUD ============ -->
+      <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
+      <button id="btnJump" class="hud-btn hidden" aria-label="QA level jumper">⏭</button>
+      <div id="progress"></div>
+      <!-- QA level jumper (config.qaJumper) -->
+      <div id="jumper" class="hidden">
+        <div class="jumper-card">
+          <div class="jumper-head"><b>QA · Jump to</b><button id="jumpClose" aria-label="Close">✕</button></div>
+          <div id="jumpList"></div>
+        </div>
+      </div>
+
+      <div id="paused" class="hidden" role="status" aria-label="Paused"><div>⏸</div></div>
+
+      <!-- ============ SCREENS ============ -->
+      <div id="startScreen" class="screen">
+        <div class="card">
+          <h1>Integers<br /><span>Rise and Fall</span></h1>
+          <div id="qaStartTag" class="hidden"></div>
+          <button id="btnStart" class="big-btn" aria-label="Play">▶</button>
+        </div>
+      </div>
+      <div id="endScreen" class="screen hidden">
+        <div class="card">
+          <h1>Integers<br /><span>Rise and Fall</span></h1>
+          <button id="btnReplay" class="big-btn" aria-label="Play again">↻</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

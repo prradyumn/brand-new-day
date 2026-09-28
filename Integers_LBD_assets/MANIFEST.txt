@@ -1,0 +1,76 @@
+Source: Figma file ZHTaSMVM72cmbAmEQvU55w (Integers), page LBD (node 94:1405)
+All PNGs are transparent, at source resolution. Duplicates, thumbnails and baked-background copies removed.
+
+button-blue-pill.png                     1672x941
+bg-sky-grass-1.png                       1672x941
+bg-sky-grass-2.png                       1672x941
+bg-sky-grass-3.png                       1672x941
+bg-sky-grass-4.png                       1672x941
+bg-meadow-lake-1.png                     1672x941
+bg-meadow-lake-2.png                     1672x941
+bg-meadow-lake-3.png                     1672x941
+bg-meadow-lake-4.png                     1672x941
+bg-mountain-lake.png                     1672x941
+bg-hills-river-1.png                     1672x941
+bg-hills-river-2.png                     1672x941
+bg-hills-river-3.png                     1672x941
+board-green-wide.png                     2170x725
+button-blue-wide.png                     2078x757
+panel-cream-tall.png                     1122x1402
+character-girl.png                       1024x1536
+arrow-markers-strip.png                  1536x1024
+character-boy.png                        1024x1536
+tank-empty-glass.png                     1024x1536
+keypad-blue-numbers.png                  1448x1086
+pipe-a-dry.png                           1448x1086
+pipe-b-dry.png                           1448x1086
+pipe-b-water.png                         1448x1086
+pipe-a-water.png                         1448x1086
+progress-bar-avatars.png                 2172x724
+answer-slots-3.png                       2172x724
+level-track-black.png                    724x2172
+button-plus-orange.png                   1086x1448
+narrator-box-empty.png                   1448x1086
+input-box-cream.png                      2172x724
+equation-slots.png                       2172x724
+panel-cream-leaves-1.png                 1254x1254
+button-white.png                         1254x1254
+button-green.png                         1254x1254
+button-blue.png                          1254x1254
+button-down-red.png                      1254x1254
+keypad-blue-plus-minus.png               1254x1254
+button-up-green.png                      1254x1254
+panel-cream-leaves-2.png                 1254x1254
+tank-full-water-glass.png                1024x1535
+board-green.png                          1872x576
+button-minus-orange.png                  992x1078
+button-close-red.png                     1254x848
+button-red.png                           1253x848
+tank-with-pipes-default.png              804x1262
+tank-with-pipes-empty.png                804x1262
+tank-with-pipes-level-scale.png          831x1080
+tank-with-pipes-small.png                667x1046
+calculator-panel-with-display.png        649x708
+calculator-panel.png                     649x708
+calculator-panel-blank-slots.png         619x698
+calculator-panel-plus-minus.png          619x698
+panel-cream-leaves-framed.png            673x443
+level-scale-with-arrows.png              249x1037
+equation-box.png                         667x263
+equation-text-0-plus-3.png               501x349
+narrator-box-with-text.png               585x258
+narration-banner.png                     1067x138
+keypad-small.png                         517x252
+keypad-grid-flat.png                     334x327
+equation-display-yellow.png              545x181
+board-green-small.png                    498x172
+board-green-zero.png                     531x148
+check-button-card.png                    422x172
+decor-plant-rock.png                     265x251
+button-check.png                         359x95
+tile-green-1.png                         157x86
+tile-white-1.png                         134x88
+tile-plus.png                            93x108
+
+reference-screens/: 9 flattened mock screens + 6 slide renders (for layout reference only)
+vectors/: 24 unique SVG vector layers (tick marks / lines from the tank scale)
