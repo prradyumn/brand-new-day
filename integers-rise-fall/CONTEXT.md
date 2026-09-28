@@ -70,7 +70,7 @@ End screen (confetti, ↻ = reload)
 
 Each question (`runQuestion()` in `game.js`) runs four phases:
 
-**Tutorial = guided demo** (`demo: true`). The game plays T0–T2 by itself so the learner sees how it works. The spotlight moves from the narrator box to the tank to the keypad, and a hand (`#hand`) moves the marker and types the answer (`demoMarker()` / `demoEntry()`). The tutorial shows all three ways to move the marker, with no added dialogue (`demoMove` in `data.js`): **T0 drags the marker**, **T1 taps the green ▲ twice**, **T2 taps the red ▼ three times**. For ▼ the hand points down from above (`#hand.flip`), because the button sits on the bottom edge. Every ▲ / ▼ press, the hand's or the learner's, shows the same feedback (`pressLever()`): the button squashes, brightens and sends out a ripple ring. Nothing waits for input, so the tutorial's wrong-answer and inactivity lines are never triggered. **From TR1 on there is no blur and no full-size character**, and the learner plays.
+**Tutorial = guided demo** (`demo: true`). The game plays T0–T2 by itself so the learner sees how it works. In T0 and T1, where something new appears, the spotlight moves from the narrator box to the tank to the keypad. T2 (`spotlight: false`) repeats the same walk-through, so it plays without the blur or the full-size character, which also eases the change into Level 1. A hand (`#hand`) moves the marker and types the answer (`demoMarker()` / `demoEntry()`). The tutorial shows all three ways to move the marker, with no added dialogue (`demoMove` in `data.js`): **T0 drags the marker**, **T1 taps the green ▲ twice**, **T2 taps the red ▼ three times**. For ▼ the hand points down from above (`#hand.flip`), because the button sits on the bottom edge. Every ▲ / ▼ press, the hand's or the learner's, shows the same feedback (`pressLever()`): the button squashes, brightens and sends out a ripple ring. Nothing waits for input, so the tutorial's wrong-answer and inactivity lines are never triggered. **From TR1 on there is no blur and no full-size character**, and the learner plays.
 
 1. **Narrate.** The VO plays in the narrator box. In the tutorial only, a frosted-glass layer blurs everything else and Guddu Bhaiya slides in. It can't be skipped. The game only continues once the line has finished (see §8, Voice-over).
 2. **Marker.** The learner drags the marker or taps ▲/▼ (tutorial: the hand drags it, with the spotlight on the tank). The learner drags the marker or taps ▲/▼. When the marker has rested for `settleMs` (1.3 s) it is checked:
@@ -80,11 +80,11 @@ Each question (`runQuestion()` in `game.js`) runs four phases:
 3. **Entry** (`entry: true`: T1/T2 demo, Level 1, Level 2, Level 3). The learner types the level (sign keys + digits) on the keypad and presses **Check**. In Level 2/3 the equation stays "… = ?" during this step and completes after Check ("Equation completes: 0 + (+3) = +3"). In Level 2 Q1 (`liveEq`) the equation follows the lever while it moves: 0 + (+1) → 0 + (+2) → 0 + (+3).
 4. **Celebrate** (CSV "Success" column). Small ✓, sparkle on the level label, the "Water Level Marked!" board and confetti. T0 (`celebrate: "small"`) gets only the ✓ and sparkle, as in CSV row 12. Crossing 0 (`crossZero: true`, Q4) gets slightly stronger sparkle and confetti.
 
-### Transitions (`flipCards()`, `dropWipe()` in `game.js`)
+### Transitions (`flipCards()`, `diveWipe()` in `game.js`)
 
 * **Next question in the same level → card flip** (≈0.8 s). The number display flips over on its horizontal axis and comes back showing the new question. In Levels 2 and 3 the equation strip follows 80 ms later. The water re-levels at the same time. In Level 1 the display flips to the same number, because each question starts where the last ended.
-* **New level → drop wipe** (≈2.1 s), at Tutorial → Level 1, Level 1 → Level 2 and Level 2 → Level 3. The screen closes into a water-drop window on the tank (`#wipe`, a deep-water curtain masked by the alpha of `assets/drop.png`). The drop itself (`#wipeDrop`) pops in where it closed. Behind it, the next level is set up (`levelWipe()`): the tank settles at the next start, and the display, equation and banner update. Then the drop swells and the window opens onto the new level. The CSV transition beat (TR1 sweep, TR2 equation panel) plays after it.
-* Neither runs before the step a QA jump starts at. With reduce-motion on, the flip becomes an instant swap and the wipe a 0.25 s fade.
+* **New level → dive into the tank** (≈2.6 s), at Tutorial → Level 1, Level 1 → Level 2 and Level 2 → Level 3. The camera (the whole `#stage`, a zoom added on top of the fit-to-window transform) plunges into the tank's water with a splash. The window goes underwater (`#under`, outside the stage so it doesn't zoom: soft light beams and rising bubbles, with a bubbles sound). The next level is set up out of sight (`levelWipe()`: the tank settles at the next start, and the display, equation and banner update). Then the camera rises out of the new tank's water with a splash and a small bounce. The CSV transition beat (TR1 sweep, TR2 equation panel) plays after it.
+* Neither runs before the step a QA jump starts at. With reduce-motion on, the flip becomes an instant swap and the dive a 0.25 s fade.
 
 ### Feedback ladder (CSV "Incorrect Feedback 1/2/3")
 
@@ -127,7 +127,7 @@ The marker goes back to the start only on `return` ("Marker returns…" / "Lever
 
 * `#focus` is a full-stage layer with `backdrop-filter: blur(10px) saturate brightness` and a light tint and sheen.
 * The "spotlight" is a `clip-path: path(evenodd, …)` with **two rounded-rect holes** (see `HOLES` and `focusOn()` in `game.js`). The path always has the same shape, so the holes **animate smoothly** between targets.
-* **Tutorial only, one highlight at a time.** The spotlight moves narrator box → tank → keypad, and the others are blurred. `focusOn()` does nothing once `S.guided` is false (from TR1 on). Feedback and hint lines use `sayFocused()`: the spotlight moves to the narrator box while Guddu speaks, then goes back.
+* **T0 and T1 only, one highlight at a time.** The spotlight moves narrator box → tank → keypad, and the others are blurred. `focusOn()` does nothing once `S.guided` is false (from TR1 on). Feedback and hint lines use `sayFocused()`: the spotlight moves to the narrator box while Guddu speaks, then goes back.
 * An unused hole is parked off-stage as `NO_HOLE`. This matters because two identical holes cancel each other under the even-odd rule.
 * Clicks outside the holes are blocked, because the layer is clipped and hit-testing follows the clip.
 * During narration the character is raised above the glass (`z-index: 45`) instead of getting a hole.
@@ -139,6 +139,7 @@ The marker goes back to the start only on `return` ("Marker returns…" / "Lever
 * Dragging past the top or bottom mark keeps scrolling, one level every 420 ms (edge auto-scroll).
 * **Tutorial water** (`water` field on a question in `data.js`): `"target"` puts the water at the answer from the start (T0). `"animate"` makes the water rise or fall from the start level to the answer once the tank is lit (T1, T2). In both cases the learner moves the marker to match the water, and moving the marker doesn't move the water (`S.water` in `game.js`). Without the field, the water follows the marker (Level 1).
 * **Water sound:** `FX.sfxLoop("fill" | "drain")` plays while the water rises or falls, and fades out 0.8 s after the water stops.
+* **One-shot sounds:** `FX.sfx(name, vol)` (pools in `fx.js`, list and levels in `FX.loadShots()` in `game.js`). **key**: keypad digits, ± and ⌫, including the tutorial hand. **lever**: ▲ / ▼. **tick**: every level the marker moves. **button**: Check, ▶, Start and tap to continue. **correct**: ✓. **board**: "Water Level Marked!". **confetti**. **wrong**: marker or keypad. **flip**: question card flip. **splashIn / bubbles / splashOut**: the level-transition dive. **complete**: end screen. They follow mute, stop when the window loses focus, and are unlocked on the Play tap like the loops.
 * **Water is pure CSS** (`#water`): a gradient body, two SVG wave bands scrolling sideways, and rising bubbles. `#glassShine` adds the glass reflections on top.
 * The water top follows the marker (`render()`), with a height transition. While it rises, the inlet pipe switches to the "water" sprite. While it falls, the outlet pipe does.
 * The dashed yellow **count line** (`#countLine`) shows the distance from the question's start level to the marker.
@@ -159,9 +160,12 @@ The marker goes back to the start only on `return` ("Marker returns…" / "Lever
 | `guddu-full.png`, `pari-full.png` | Characters (Pari is included for later story scenes) |
 | `board-green.png` | "Water Level Marked!" board |
 | `panel-title.png` | Start/end card |
-| `drop.png` | Water drop (user-supplied reference, trimmed to 480 px). Level-transition wipe: its alpha is the window shape, and the image is the drop that pops |
+| `drop.png` | Water drop (user-supplied reference, trimmed to 480 px). Currently unused: it was the earlier drop wipe, kept for later use |
 | `sfx/water-fill.mp3` | Mixkit "Filling sink with water" (#1819), trimmed to a 7 s loop. Mixkit Free Sound Effects License |
 | `sfx/water-drain.mp3` | Mixkit "Sink drain" (#1878), trimmed to a 10 s loop. Mixkit Free Sound Effects License |
+| `sfx/key.wav` · `lever.wav` · `tick.wav` · `button.wav` · `board.wav` · `wrong.wav` · `flip.wav` | Mixkit #1120 click box check · #2568 interface click tone · #1317 water bubble · #3005 light pop · #2357 bubble pop-up · #2569 negative tone tap · #1104 page turn. Trimmed so each starts on its first sound, peak-normalised, and saved as WAV so short clicks don't lag. Mixkit Free Sound Effects License |
+| `sfx/correct.mp3` · `confetti.mp3` · `complete.mp3` | Mixkit #3193 bubbly achievement tone · #2359 silly pop cluster · #2059 game level completed. Trimmed and normalised the same way |
+| `sfx/splash-in.mp3` · `bubbles.mp3` · `splash-out.mp3` | Level-transition dive: Mixkit #1304 jumping into water · #1321 deep water bubbles · #1311 water splash |
 
 The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma key style. The Figma keypad image only has 0–6, and Q6 needs 7.
 

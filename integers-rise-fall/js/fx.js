@@ -277,8 +277,40 @@
     s.timer = setTimeout(() => stopOne(s, 350), holdMs);
   };
 
-  /** Stop every loop (hard = cut instantly, used when leaving the page). */
-  FX.stopSfx = (hard) => { for (const k in SFX) stopOne(SFX[k], hard ? 0 : 100); };
+  /* ---------- One-shot sound effects (clicks, chimes, pops) ----------
+     Each sound has a small pool of <audio> elements so quick repeats
+     (typing, ticking through levels) overlap instead of cutting off.
+     Same rules as the loops: silent while muted or away. */
+  const SHOTS = {};
+  FX.loadShots = (map) => {
+    for (const [name, def] of Object.entries(map)) {
+      const { url, vol = 0.7, pool = 3 } = typeof def === "string" ? { url: def } : def;
+      SHOTS[name] = { vol, i: 0, els: Array.from({ length: pool }, () => { const a = new Audio(url); a.preload = "auto"; return a; }) };
+    }
+  };
+  /** Play a one-shot. `vol` scales the sound's own level (0–1). */
+  FX.sfx = (name, vol = 1) => {
+    const s = SHOTS[name];
+    if (!s || FX.muted || isAway()) return;
+    const a = s.els[s.i = (s.i + 1) % s.els.length];
+    try { a.currentTime = 0; } catch (e) {}
+    a.volume = Math.max(0, Math.min(1, s.vol * vol));
+    a.play().catch(() => {});
+  };
+  const unlockLoops = FX.unlockSfx;
+  FX.unlockSfx = () => {
+    unlockLoops();
+    for (const k in SHOTS) for (const a of SHOTS[k].els) {
+      a.muted = false; a.volume = 0;
+      a.play().then(() => { if (a.volume === 0) { a.pause(); a.currentTime = 0; } }).catch(() => {}); // don't cut a real sound that started meanwhile
+    }
+  };
+
+  /** Stop every loop (hard = cut instantly, used when leaving the page) and any playing one-shot. */
+  FX.stopSfx = (hard) => {
+    for (const k in SFX) stopOne(SFX[k], hard ? 0 : 100);
+    for (const k in SHOTS) for (const a of SHOTS[k].els) if (!a.paused) a.pause();
+  };
 
   /* ---------- Sparkles ---------- */
   FX.sparkle = (layer, x, y, n = 14, spread = 110) => {

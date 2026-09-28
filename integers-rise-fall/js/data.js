@@ -34,6 +34,7 @@ window.GAME_DATA = {
        start / target   marker level at the start / the answer
        demo             tutorial: the game plays it by itself (a hand moves the marker and types)
        demoMove         how the hand moves the marker: "drag" it, or "tap" the ▲ / ▼ buttons
+       spotlight        false = no frosted-glass spotlight or full-size character for this tutorial step
        entry            true = learner also types the level on the keypad
        eq               { a, op, b } = the equation "a op (b) = ?" shown on top of the keypad (Level 2, Level 3)
        liveEq           the equation updates as each step is moved (CSV Level 2 Q1)
@@ -78,6 +79,7 @@ window.GAME_DATA = {
     },
     {
       type: "question", id: "T2", section: "tutorial", demo: true, demoMove: "tap",
+      spotlight: false,                               // nothing new since T1 apart from ▼: plays without the blur
       start: 0, target: -3, entry: true,
       water: "animate",
       vo: "The water level goes down by 3 levels. Move the marker down 3 levels. Where does it reach? Enter the number.",

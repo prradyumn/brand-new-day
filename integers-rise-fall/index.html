@@ -105,10 +105,6 @@
       <div id="markedBadge"><span></span></div>
       <canvas id="confetti" width="1920" height="1080"></canvas>
 
-      <!-- Level transition: the screen closes into a water drop -->
-      <div id="wipe" class="hidden"></div>
-      <img id="wipeDrop" class="hidden" src="assets/drop.png" alt="" draggable="false" />
-
       <!-- ============ HUD ============ -->
       <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
       <button id="btnJump" class="hud-btn hidden" aria-label="QA level jumper">⏭</button>
@@ -140,6 +136,9 @@
 
     </div>
   </div>
+
+  <!-- Level transition: underwater layer (outside the stage so it doesn't zoom with the camera) -->
+  <div id="under" class="hidden" aria-hidden="true"><div class="rays"></div><div class="bubbles"></div></div>
 
   <script src="js/data.js"></script>
   <script src="js/fx.js"></script>

@@ -62,7 +62,7 @@
     fx: $("fxLayer"), confetti: $("confetti"), marked: $("markedBadge"),
     gateBtn: $("gateBtn"), progress: $("progress"), paused: $("paused"),
     btnMute: $("btnMute"), startScreen: $("startScreen"), endScreen: $("endScreen"), hand: $("hand"),
-    wipe: $("wipe"), wipeDrop: $("wipeDrop")
+    under: $("under")
   };
 
   /* ---------------- State ---------------- */
@@ -78,7 +78,7 @@
     water: null,         // fixed water level (tutorial); null = water follows the marker
     entry: "",
     gate: null,          // current transition step
-    guided: DATA.steps[0].section === "tutorial", // spotlight/blur + character only in the tutorial
+    guided: false,       // spotlight/blur + character (tutorial steps that introduce something new)
     eqLive: false,       // equation follows the marker (CSV Level 2 Q1)
     labels: {}, ticks: {}, tticks: {},
     timers: { settle: null, idle: null, edge: null, pipeIn: null, pipeOut: null },
@@ -87,12 +87,33 @@
 
   window.__GAME_STATE = S; // exposed for debugging / automated tests
 
+  // Spotlight + character only where the tutorial introduces something new (T0, T1);
+  // a step can opt out with `spotlight: false` (T2 repeats the same walk-through).
+  const isGuided = (step) => !!step && step.section === "tutorial" && step.spotlight !== false;
+  S.guided = isGuided(DATA.steps[0]);
+
   // QA: ?step=ID starts the game at that step (see the level jumper below)
   const START_ID = new URLSearchParams(location.search).get("step");
   const START_INDEX = Math.max(0, DATA.steps.findIndex((s) => s.id === START_ID));
 
   FX.lang = CFG.speechLang;
   FX.loadSfx({ fill: "assets/sfx/water-fill.mp3", drain: "assets/sfx/water-drain.mp3" });
+  // One-shots (Mixkit free licence, trimmed so each starts on its first sound — see CONTEXT.md §7)
+  FX.loadShots({
+    key:      { url: "assets/sfx/key.wav",      vol: 0.55, pool: 4 },  // keypad digits, ±, ⌫
+    lever:    { url: "assets/sfx/lever.wav",    vol: 0.6,  pool: 3 },  // ▲ / ▼ press
+    tick:     { url: "assets/sfx/tick.wav",     vol: 0.45, pool: 4 },  // each level the marker moves
+    button:   { url: "assets/sfx/button.wav",   vol: 0.6 },            // Check, ▶, Start, tap to continue
+    correct:  { url: "assets/sfx/correct.mp3",  vol: 0.6,  pool: 2 },  // ✓ on a right answer
+    board:    { url: "assets/sfx/board.wav",    vol: 0.5,  pool: 2 },  // "Water Level Marked!" board
+    confetti: { url: "assets/sfx/confetti.mp3", vol: 0.35, pool: 2 },  // confetti burst
+    wrong:    { url: "assets/sfx/wrong.wav",    vol: 0.5,  pool: 2 },  // wrong marker / keypad answer
+    flip:     { url: "assets/sfx/flip.wav",     vol: 0.7,  pool: 2 },  // question card flip
+    splashIn: { url: "assets/sfx/splash-in.mp3", vol: 0.6, pool: 1 },  // level transition: dive in
+    bubbles:  { url: "assets/sfx/bubbles.mp3",   vol: 0.5, pool: 1 },  //   underwater
+    splashOut:{ url: "assets/sfx/splash-out.mp3",vol: 0.55, pool: 1 }, //   rise out
+    complete: { url: "assets/sfx/complete.mp3", vol: 0.6,  pool: 1 }   // end screen
+  });
   FX.rate = CFG.speechRate;
 
   /* =================================================================
@@ -205,6 +226,7 @@
     S.level = L;
     ensureVisible(L);
     render();
+    FX.sfx("tick");                       // a small bloop for every level counted
     if (S.water === null) waterFlow(dir); // water only moves when it follows the marker
     if (S.eqLive) renderEq(S.q, { moved: L - S.q.start });
     return true;
@@ -281,7 +303,7 @@
     ring.classList.toggle("on", !!show);
   }
   function focusOn(key) {
-    if (key && !S.guided) key = null;   // the spotlight is only used in the tutorial
+    if (key && !S.guided) key = null;   // the spotlight is only used in T0 and T1
     if (!key) {
       S.focusKey = null;
       el.focus.classList.remove("on");
@@ -443,7 +465,7 @@
     if (setLevel(S.level + dir)) afterMove();
   }
   /** Press feedback on ▲ / ▼: squash, brighten and a ripple ring. */
-  function pressLever(btn) { FX.flash(btn, "tap", 520); }
+  function pressLever(btn) { FX.flash(btn, "tap", 520); FX.sfx("lever"); }
   el.btnUp.addEventListener("pointerdown", (e) => { e.stopPropagation(); step(1); });
   el.btnDown.addEventListener("pointerdown", (e) => { e.stopPropagation(); step(-1); });
   el.marker.addEventListener("keydown", (e) => {
@@ -472,6 +494,7 @@
     S.wrongMarker = (S.wrongMarker || 0) + 1;
     const fb = q.wrong[Math.min(S.wrongMarker, q.wrong.length) - 1];
     FX.flash(el.marker, "shake", 500);
+    FX.sfx("wrong");
     await sayFocused(fb.text, "sad");
     await runFx(fb.fx, q, fb);
     setBanner(q.ost, "happy");
@@ -650,6 +673,7 @@
     applyKey(k);
   }
   function applyKey(k) {
+    FX.sfx("key");
     let sign = /^[+-]/.test(S.entry) ? S.entry[0] : "";
     let digits = S.entry.replace(/^[+-]/, "");
     if (k === "+" || k === "-") sign = k;
@@ -663,12 +687,14 @@
   function backspace() {
     if (S.phase !== "entry") return;
     resetIdle();
+    FX.sfx("key", 0.8);
     S.entry = S.entry.slice(0, -1);
     entryDisplay();
   }
   async function checkEntry() {
     if (S.phase !== "entry") return;
     resetIdle();
+    FX.sfx("button");
     const m = /^([+-]?)(\d+)$/.exec(S.entry);
     if (!m) { FX.flash(el.plate, "shake", 500); return; }
     const val = (m[1] === "-" ? -1 : 1) * parseInt(m[2], 10);
@@ -682,6 +708,7 @@
   /** Wrong keypad answer. The CSV gives no line for this, so it is shown, not spoken. */
   function entryWrong() {
     S.wrongEntry = (S.wrongEntry || 0) + 1;
+    FX.sfx("wrong");
     FX.flash(el.plate, "shake", 500);
     FX.badge(el.fx, 790, 350, false);
     S.entry = "";
@@ -778,6 +805,7 @@
       await handTap(node);
       applyKey(k);
     }
+    FX.sfx("button");
     await handTap(el.btnCheck);
     handHide();
   }
@@ -785,9 +813,7 @@
   /* =================================================================
      Transitions
        · question → question (same level): card flip of the display + equation
-       · level → level: the screen closes into a water drop (assets/drop.png)
-         on the tank, the drop pops, the next level is set up behind it,
-         and the drop swells open onto the new level
+       · level → level: dive into the tank (see diveWipe)
      ================================================================= */
   const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const FLIP = (deg) => ({ transform: `perspective(900px) rotateX(${deg}deg)` });
@@ -795,6 +821,7 @@
   async function flipCards(swap) {
     const cards = [el.plate, el.eqPanel].filter((n) => !n.classList.contains("hidden") && !n.classList.contains("away"));
     if (!cards.length || REDUCED) { swap(); return; }
+    FX.sfx("flip");
     const anims = [];
     await Promise.all(cards.map((c, i) => {
       const a = c.animate([FLIP(0), FLIP(90)], { duration: 260, delay: i * 80, easing: "ease-in", fill: "forwards" });
@@ -815,57 +842,74 @@
     return q ? q.section : step.id;
   }
 
-  const WIPE = { cx: 1407, cy: 560, ratio: 1260 / 912, anchor: 0.62, max: 5200, drop: 240 };
-  function setHole(w) {
-    const h = w * WIPE.ratio;
-    const size = `${w}px ${h}px, 100% 100%`, pos = `${WIPE.cx - w / 2}px ${WIPE.cy - h * WIPE.anchor}px, 0 0`;
-    el.wipe.style.webkitMaskSize = size; el.wipe.style.maskSize = size;
-    el.wipe.style.webkitMaskPosition = pos; el.wipe.style.maskPosition = pos;
+  /* Level change: "dive into the tank". The camera (the whole #stage) zooms into
+     the water, the screen goes underwater (#under: bubbles + light rays, outside
+     the stage so it doesn't zoom), the next level is set up out of sight, and the
+     camera rises back out of the new tank's water with a small bounce. */
+  const TANK_X = 1407;                                              // centre of the glass
+  const camAt = (base, y, k) => `${base} translate(${TANK_X}px, ${y}px) scale(${k}) translate(${-TANK_X}px, ${-y}px)`;
+  function riseBubbles(n) {
+    const box = el.under.querySelector(".bubbles");
+    for (let i = 0; i < n; i++) {
+      const b = document.createElement("span");
+      const sz = 1 + Math.random() * 3.6;
+      Object.assign(b.style, { width: sz + "vmin", height: sz + "vmin", left: Math.random() * 100 + "%" });
+      box.appendChild(b);
+      b.animate([{ transform: "translate(0, 0)", opacity: 0 }, { opacity: 1, offset: 0.1 },
+                 { transform: `translate(${(Math.random() - 0.5) * 8}vmin, -125vh)`, opacity: 0.9 }],
+        { duration: 1300 + Math.random() * 900, delay: Math.random() * 600, easing: "ease-in", fill: "forwards" })
+        .finished.then(() => b.remove());
+    }
   }
-  function tween(ms, ease, fn) {
-    return new Promise((res) => {
-      const t0 = performance.now();
-      const tick = (now) => { const k = Math.min(1, (now - t0) / ms); fn(ease(k)); if (k < 1) requestAnimationFrame(tick); else res(); };
-      requestAnimationFrame(tick);
-    });
-  }
-  const easeIn = (k) => k * k * k, easeOut = (k) => 1 - Math.pow(1 - k, 3);
 
-  async function dropWipe(during) {
+  async function diveWipe(during) {
+    const under = el.under;
     if (REDUCED) {                                                  // reduce-motion: a short fade
-      el.wipe.classList.add("plain"); el.wipe.classList.remove("hidden");
-      await el.wipe.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: "forwards" }).finished;
+      under.classList.remove("hidden");
+      await under.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: "forwards" }).finished;
       await during();
-      await el.wipe.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: "forwards" }).finished;
-      el.wipe.classList.add("hidden"); el.wipe.classList.remove("plain");
-      el.wipe.getAnimations().forEach((a) => a.cancel());
+      await under.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: "forwards" }).finished;
+      under.classList.add("hidden"); under.getAnimations().forEach((a) => a.cancel());
       return;
     }
-    setHole(WIPE.max);
-    el.wipe.classList.remove("hidden");
-    await tween(620, easeIn, (e) => setHole(WIPE.max * (1 - e)));  // the screen closes into a drop
-    const d = el.wipeDrop;
-    d.style.left = WIPE.cx - WIPE.drop / 2 + "px";
-    d.style.top = WIPE.cy - WIPE.drop * WIPE.ratio * WIPE.anchor + "px";
-    d.classList.remove("hidden");
-    await d.animate([{ transform: "scale(0)" }, { transform: "scale(1.14)", offset: 0.65 }, { transform: "scale(1)" }],
-      { duration: 420, easing: "cubic-bezier(.34,1.56,.64,1)", fill: "forwards" }).finished;
-    await during();                                                 // next level set up behind the curtain
-    await FX.sleep(260);
-    const swell = d.animate([{ transform: "scale(1)", opacity: 1 }, { transform: "scale(2.8)", opacity: 0 }],
-      { duration: 520, easing: "ease-in", fill: "forwards" });
-    await tween(720, easeOut, (e) => setHole(WIPE.drop + (WIPE.max - WIPE.drop) * e)); // …and opens onto it
-    await swell.finished;
-    el.wipe.classList.add("hidden");
-    d.classList.add("hidden");
-    d.getAnimations().forEach((a) => a.cancel());
+    const base = el.stage.style.transform;
+    const inY = Math.min(955, levelY(S.water !== null ? S.water : S.level) + 50);   // just under the water line
+    el.stage.style.willChange = "transform";
+    FX.sfx("splashIn");
+    const dive = el.stage.animate([{ transform: camAt(base, inY, 1) }, { transform: camAt(base, inY, 6) }],
+      { duration: 900, easing: "cubic-bezier(.6,0,.9,.5)", fill: "forwards" });
+    await FX.sleep(420);
+    under.classList.remove("hidden");
+    under.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, fill: "forwards" });
+    riseBubbles(30);
+    FX.sfx("bubbles");
+    await dive.finished;
+
+    await during();                                                 // next level set up while underwater
+
+    const outY = Math.min(900, levelY(S.level) + 130);              // rise out of the new tank's water
+    const rise = el.stage.animate([{ transform: camAt(base, outY, 6) }, { transform: camAt(base, outY, 0.97), offset: 0.85 }, { transform: camAt(base, outY, 1) }],
+      { duration: 1000, delay: 600, easing: "cubic-bezier(.1,.6,.3,1)", fill: "both" });
+    dive.cancel();
+    await FX.sleep(600);
+    FX.sfx("splashOut");
+    riseBubbles(12);
+    under.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 520, delay: 250, fill: "forwards" });
+    await rise.finished;
+    rise.cancel();
+    el.stage.style.willChange = "";
+    under.classList.add("hidden");
+    under.getAnimations().forEach((a) => a.cancel());
+    under.querySelector(".bubbles").innerHTML = "";
   }
 
-  /** Level change: drop wipe, with the board reset for the step that opens the next level. */
+  /** Level change: the dive, with the board reset for the step that opens the next level. */
   function levelWipe(step) {
     const i = DATA.steps.indexOf(step);
     const nq = step.type === "question" ? step : DATA.steps.slice(i).find((s) => s.type === "question");
-    return dropWipe(async () => {
+    S.guided = false;
+    focusOn(null);                                                  // no blur layer while the camera moves
+    return diveWipe(async () => {
       S.guided = false;
       focusOn(null);
       el.character.classList.remove("in", "talk");
@@ -890,10 +934,13 @@
     const small = q.celebrate === "small";
     FX.sparkle(el.fx, LABEL_X, y, q.crossZero ? 22 : 16, q.crossZero ? 150 : 120);
     FX.badge(el.fx, 1500, Math.max(200, Math.min(880, y)), true);
+    FX.sfx("correct");
     FX.flash(S.labels[q.target], "pulse", 2800);
     if (!small) {
       el.marked.querySelector("span").textContent = DATA.ui.marked;
       FX.flash(el.marked, "show", 2300);
+      setTimeout(() => FX.sfx("board"), 250);
+      setTimeout(() => FX.sfx("confetti"), 120);
       FX.confetti(el.confetti, { count: q.crossZero ? 150 : 90, x: 820, y: 330, power: q.crossZero ? 1.12 : 1 });
     }
     await say(q.correct, "happy");
@@ -905,7 +952,8 @@
      ================================================================= */
   async function runQuestion(q, { flip = false } = {}) {
     S.q = q;
-    S.guided = q.section === "tutorial";
+    S.guided = isGuided(q);
+    if (!S.guided) focusOn(null);        // drop a spotlight left over from the previous step
     S.wrongMarker = 0; S.wrongEntry = 0;
     S.countFrom = null;
     el.marker.classList.remove("locked");
@@ -1049,13 +1097,13 @@
   }
   el.gateBtn.addEventListener("pointerdown", (e) => {
     e.stopPropagation();
-    if (S.resolveGate) S.resolveGate();
+    if (S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   });
   // "Learner observes and taps to continue." — a tap anywhere on the game, including
   // the keypad (capture phase, before the keys stop the event); HUD/QA controls excluded
   el.stage.addEventListener("pointerdown", (e) => {
     if (e.target.closest("#btnMute, #btnJump, #jumper, #paused")) return;
-    if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) S.resolveGate();
+    if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   }, true);
 
   /* =================================================================
@@ -1104,7 +1152,7 @@
   function prepareJump() {
     if (!START_INDEX) return;
     const before = DATA.steps.slice(0, START_INDEX);
-    S.guided = DATA.steps[START_INDEX].section === "tutorial";
+    S.guided = isGuided(DATA.steps[START_INDEX]);
     if (before.some((s) => s.appear === "eqPanel")) setMode("lvl");
     if (before.some((s) => s.entry)) {
       [el.panel, el.plate, el.connector].forEach((n) => n.classList.remove("hidden"));
@@ -1136,7 +1184,7 @@
   async function run() {
     let prev = null;
     for (const step of DATA.steps.slice(START_INDEX)) {
-      if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // drop wipe between levels
+      if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;
       if (step.type === "question") await runQuestion(step, { flip });
@@ -1146,6 +1194,7 @@
     // End
     focusOn(null);
     FX.confetti(el.confetti, { count: 260, x: 960, y: 420, power: 1.3, spread: 1.4 });
+    FX.sfx("complete");
     el.endScreen.classList.remove("hidden");
   }
 
@@ -1166,6 +1215,7 @@
     $("btnStart").addEventListener("click", () => {
       FX.unlockSpeech(); // Safari/iOS: speech and audio must be started from this tap
       FX.unlockSfx();
+      setTimeout(() => FX.sfx("button"), 60);  // after the unlock (which briefly plays everything at volume 0)
       el.startScreen.classList.add("fade");
       setTimeout(() => el.startScreen.classList.add("hidden"), 500);
       run();
@@ -1187,7 +1237,7 @@
   // Preload images so nothing pops in mid-animation
   const PRELOAD = ["bg", "tank-empty", "pipe-in-dry", "pipe-in-water", "pipe-out-dry", "pipe-out-water", "track",
     "btn-up", "btn-down", "plate-blue", "panel-cream", "strip-cream", "board-green", "panel-title",
-    "banner-bar", "guddu-happy", "guddu-sad", "guddu-think", "guddu-full", "drop"];
+    "banner-bar", "guddu-happy", "guddu-sad", "guddu-think", "guddu-full"];
   Promise.all(PRELOAD.map((n) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `assets/${n}.png`; })))
     .then(init);
   fitStage();
