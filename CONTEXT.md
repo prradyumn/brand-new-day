@@ -19,16 +19,23 @@ or use the VS Code "Live Server" extension. The only network request is the **Nu
 
 ## 2. Files
 
+The game lives at the **repository root** (so Vercel serves `index.html` directly):
+
 ```
-integers-rise-fall/
+brand-new-day/        (repo root)
 ├── index.html        DOM for the 1920×1080 stage (every element is here, hidden or shown by JS)
 ├── css/style.css     All visuals, positions (Figma px), water, focus glass, animations
 ├── js/data.js        CONTENT ONLY: config + every VO/OST/feedback line + question list
 ├── js/fx.js          Helpers: sleep, voice-over (TTS), sparkles, badges, confetti
 ├── js/game.js        Engine: flow, marker drag, scale scrolling, keypad, feedback
 ├── assets/           PNGs harvested from Figma (see §7)
-└── CONTEXT.md        This file
+├── CONTEXT.md        This file
+├── Integers_LBD_assets/  Raw Figma exports (source art, not used by the game; excluded from Vercel by .vercelignore)
+├── .vercelignore     Keeps the deploy to the game files
+└── .gitignore
 ```
+
+**Deploy (Vercel):** static site, no build step. Framework preset "Other", Root Directory empty (the repo root), no build or output command.
 
 Script load order matters: `data.js` → `fx.js` → `game.js`.
 

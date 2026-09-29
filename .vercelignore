@@ -1,0 +1,4 @@
+# Keep the Vercel upload to the game itself
+Integers_LBD_assets/
+.vscode/
+.DS_Store
