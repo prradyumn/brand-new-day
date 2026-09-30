@@ -21,11 +21,19 @@
   };
 
   /* ---------- Voice-over ----------
-     Uses the browser's SpeechSynthesis. To use recorded audio later,
-     replace FX.speak() with an <audio> player that resolves on "ended". */
+     Recorded clips first: assets/vo/manifest.js (made by tools/generate-audio.mjs)
+     maps "speaker|line" to an MP3. A line without a clip, or whose clip can't
+     play, is read by the browser's SpeechSynthesis instead. Either way the
+     promise resolves only when the line has really finished. */
   const synth = window.speechSynthesis || null;
   let voice = null;
   FX.muted = false;
+  const CLIPS = window.VO_MANIFEST || {};
+  FX.clipFor = (text, speaker) => CLIPS[(speaker || "guddu") + "|" + text] || null;
+  // One shared element for every clip: iOS only lets an element that was
+  // unlocked by a tap play later, so the same one is reused.
+  const voEl = new Audio();
+  voEl.preload = "auto";
 
   function pickVoice(lang) {
     if (!synth) return null;
@@ -41,7 +49,7 @@
   }
   if (synth) synth.onvoiceschanged = () => { voice = pickVoice(FX.lang || "en-IN"); };
 
-  /** Reading-time estimate used when muted / no TTS (ms). */
+  /** Reading-time estimate used when muted / no voice (ms). */
   FX.readTime = (text) => Math.max(1600, text.length * 55 + 900);
 
   /* The voice only plays while the game is on screen. When the tab is hidden
@@ -55,12 +63,14 @@
   function onPresence() {
     if (isAway()) {
       if (synth) synth.cancel();
+      voEl.pause();
       FX.stopSfx(true);
       leaveHooks.forEach((h) => h());
     } else {
       const w = backWaiters; backWaiters = [];
       w.forEach((r) => r());
     }
+    syncMusic();
   }
   document.addEventListener("visibilitychange", onPresence);
   window.addEventListener("blur", () => { blurred = true; onPresence(); });
@@ -72,10 +82,9 @@
   window.addEventListener("keydown", here, true);
   // Closing or reloading the tab: the OS voice can keep talking after the page
   // is gone, so silence it on the way out and clear any leftover on load.
-  const silence = () => { if (synth) synth.cancel(); FX.stopSfx && FX.stopSfx(true); };
+  const silence = () => { if (synth) synth.cancel(); voEl.pause(); FX.stopSfx && FX.stopSfx(true); music.a && music.a.pause(); };
   window.addEventListener("pagehide", silence);
   window.addEventListener("beforeunload", silence);
-  silence();
 
   let gen = 0; // bumped by every new line and by stopSpeech(), so stale lines never replay
   const muteHooks = new Set();
@@ -93,12 +102,19 @@
   function speakOnce(text, spoken, opts) {
     return new Promise((resolve) => {
       const t0 = performance.now();
-      let done = false, timer = null, poll = null, muting = false;
+      let done = false, timer = null, poll = null, muting = false, clipOn = false;
+      const stopClip = () => {
+        if (!clipOn) return;
+        clipOn = false;
+        voEl.onended = voEl.onerror = voEl.onplaying = null;
+        voEl.pause();
+      };
       const finish = (cut) => {
         if (done) return;
         done = true;
         clearTimeout(timer);
         clearInterval(poll);
+        stopClip();
         leaveHooks.delete(onLeave);
         muteHooks.delete(onMute);
         resolve(!!cut);
@@ -114,94 +130,144 @@
       const onMute = () => {
         muting = true;
         clearInterval(poll);
-        try { synth.cancel(); } catch (e) {}
+        stopClip();
+        try { synth && synth.cancel(); } catch (e) {}
         readFallback();
       };
       muteHooks.add(onMute);
 
-      if (FX.muted || !synth) { readFallback(); return; }
-      /* The line counts as done only when the speech engine has really finished
-         it. No fixed timer can cut a slow voice short:
-           - `onend` is the normal signal;
-           - polling `speaking` catches engines that drop `onend` (Chrome);
-           - if speech never starts, the text gets its reading time and a notice appears;
-           - a very generous cap only guards against a stuck engine. */
-      let started = false, quiet = 0;
-      const markStarted = () => {
-        if (started || done) return;
-        started = true;
-        clearTimeout(timer);
-        timer = setTimeout(finish, FX.readTime(text) * 3 + 10000);
-      };
-      timer = setTimeout(() => {
-        if (started) return;
-        voiceProblem("no speech started");
-        finish();
-      }, Math.max(2500, FX.readTime(text)));
+      if (FX.muted) { readFallback(); return; }
 
-      const go = () => {
-        if (done || muting) return;
-        try {
-          if (synth.paused) synth.resume(); // Chrome can be left paused after the tab was hidden
-          const u = new SpeechSynthesisUtterance(spoken);
-          FX._utterance = u; // keep a reference: Chrome drops `onend` if the utterance is garbage-collected
-          voice = voice || pickVoice(FX.lang || "en-IN");
-          if (voice) u.voice = voice;
-          u.lang = (voice && voice.lang) || FX.lang || "en-IN";
-          u.rate = opts.rate || FX.rate || 0.95;
-          u.pitch = 1.05;
-          u.onstart = () => { console.info("[voice] speaking:", text, "| voice:", u.voice ? u.voice.name : "default"); markStarted(); };
-          u.onend = () => { if (!muting) finish(); };
-          u.onerror = (e) => {
-            if (muting) return;
-            // our own cancel (a newer line / leaving) ends it; a real failure keeps the reading time
-            if (e && (e.error === "interrupted" || e.error === "canceled")) finish();
-            else { voiceProblem(e && e.error); readFallback(); }
-          };
-          synth.speak(u);
-          poll = setInterval(() => {
-            if (synth.speaking) { markStarted(); quiet = 0; return; }
-            if (started && !synth.pending && ++quiet >= 3) finish();
-          }, 250);
-        } catch (e) {
-          voiceProblem(e.message);
-          readFallback();
-        }
-      };
-      // speak() straight after cancel() is silently dropped by some browsers,
-      // so clear a previous line first and give the engine a moment.
-      if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(go, 80); }
-      else go();
+      /* ---- Recorded clip ---- */
+      const clip = FX.clipFor(text, opts.speaker);
+      if (clip) {
+        clipOn = true;
+        let started = false;
+        const toSynth = (why) => {                       // clip missing / blocked: the browser voice reads it
+          if (done || muting || !clipOn) return;
+          console.warn("[voice] clip did not play, using the browser voice:", clip, why);
+          stopClip();
+          startSynth();
+        };
+        voEl.onplaying = () => {
+          if (started) return;
+          started = true;
+          clearTimeout(timer);                           // a generous cap only guards against a stuck element
+          timer = setTimeout(finish, ((voEl.duration || 10) * 3 + 10) * 1000);
+        };
+        voEl.onended = () => finish();
+        voEl.onerror = () => toSynth("error");
+        voEl.src = clip;
+        voEl.volume = 1;
+        const p = voEl.play();
+        if (p && p.catch) p.catch((e) => toSynth(e && e.name));
+        timer = setTimeout(() => { if (!started) toSynth("did not start"); }, 5000);
+        return;
+      }
+      startSynth();
+
+      /* ---- Browser voice ---- */
+      function startSynth() {
+        if (!synth) { readFallback(); return; }
+        /* The line counts as done only when the speech engine has really finished
+           it. No fixed timer can cut a slow voice short:
+             - `onend` is the normal signal;
+             - polling `speaking` catches engines that drop `onend` (Chrome);
+             - if speech never starts, the text gets its reading time and a notice appears;
+             - a very generous cap only guards against a stuck engine. */
+        let started = false, quiet = 0;
+        const markStarted = () => {
+          if (started || done) return;
+          started = true;
+          clearTimeout(timer);
+          timer = setTimeout(finish, FX.readTime(text) * 3 + 10000);
+        };
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (started) return;
+          voiceProblem("no speech started");
+          finish();
+        }, Math.max(2500, FX.readTime(text)));
+
+        const go = () => {
+          if (done || muting) return;
+          try {
+            if (synth.paused) synth.resume(); // Chrome can be left paused after the tab was hidden
+            const u = new SpeechSynthesisUtterance(spoken);
+            FX._utterance = u; // keep a reference: Chrome drops `onend` if the utterance is garbage-collected
+            voice = voice || pickVoice(FX.lang || "en-IN");
+            if (voice) u.voice = voice;
+            u.lang = (voice && voice.lang) || FX.lang || "en-IN";
+            u.rate = opts.rate || FX.rate || 0.95;
+            u.pitch = opts.pitch || 1.05;   // game.js: a little higher for Pari
+            u.onstart = () => { console.info("[voice] speaking:", text, "| voice:", u.voice ? u.voice.name : "default"); markStarted(); };
+            u.onend = () => { if (!muting) finish(); };
+            u.onerror = (e) => {
+              if (muting) return;
+              // our own cancel (a newer line / leaving) ends it; a real failure keeps the reading time
+              if (e && (e.error === "interrupted" || e.error === "canceled")) finish();
+              else { voiceProblem(e && e.error); readFallback(); }
+            };
+            synth.speak(u);
+            poll = setInterval(() => {
+              if (synth.speaking) { markStarted(); quiet = 0; return; }
+              if (started && !synth.pending && ++quiet >= 3) finish();
+            }, 250);
+          } catch (e) {
+            voiceProblem(e.message);
+            readFallback();
+          }
+        };
+        // speak() straight after cancel() is silently dropped by some browsers,
+        // so clear a previous line first and give the engine a moment.
+        if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(go, 80); }
+        else go();
+      }
     });
   }
 
-  /** Speak text. Resolves when finished (or after a reading-time fallback). */
+  /** Speak text. Resolves when finished (or after a reading-time fallback).
+      opts: { speaker, pitch, rate } — `speaker` picks the recorded clip. */
   FX.speak = async (text, opts = {}) => {
     const my = ++gen;
-    // Screen-reader friendly symbols
+    // Screen-reader friendly symbols (browser voice only; clips are recorded from the same line)
     const spoken = text
       .replace(/−/g, "minus ")
       .replace(/\+(\d)/g, "plus $1")
       .replace(/\(|\)/g, "")
       .replace(/=/g, " equals ")
       .replace(/\?$/, "?");
-    for (;;) {
-      if (isAway()) {
-        // tell the page it's waiting for the learner, so it can show a "Paused" card
-        window.dispatchEvent(new Event("fx:paused"));
-        await whenBack();
-        window.dispatchEvent(new Event("fx:resumed"));
+    duck(true);                                   // music dips under the voice
+    try {
+      for (;;) {
+        if (isAway()) {
+          // tell the page it's waiting for the learner, so it can show a "Paused" card
+          window.dispatchEvent(new Event("fx:paused"));
+          await whenBack();
+          window.dispatchEvent(new Event("fx:resumed"));
+        }
+        if (my !== gen) return;
+        const cut = await speakOnce(text, spoken, opts);
+        if (!cut || my !== gen) return;
       }
-      if (my !== gen) return;
-      const cut = await speakOnce(text, spoken, opts);
-      if (!cut || my !== gen) return;
+    } finally {
+      if (my === gen) duck(false);
     }
   };
 
-  FX.stopSpeech = () => { gen++; if (synth) synth.cancel(); };
+  FX.stopSpeech = () => { gen++; if (synth) synth.cancel(); voEl.pause(); duck(false); };
 
-  /** Call synchronously inside the Play click. Safari only allows speech that starts from a tap. */
+  /** Call synchronously inside the Play click. Safari only allows speech and
+      audio that start from a tap: this unlocks the browser voice and the clip player. */
   FX.unlockSpeech = () => {
+    const first = Object.values(CLIPS)[0];
+    if (first) {
+      try {
+        voEl.src = first; voEl.muted = false; voEl.volume = 0;
+        const p = voEl.play();
+        if (p && p.then) p.then(() => { if (voEl.volume === 0) voEl.pause(); }).catch(() => {});
+      } catch (e) {}
+    }
     if (!synth) return;
     try {
       synth.getVoices();
@@ -211,11 +277,44 @@
     } catch (e) {}
   };
 
-  /** Mute / unmute voice + sound effects without skipping the current line. */
+  /** Mute / unmute voice, music + sound effects without skipping the current line. */
   FX.setMuted = (m) => {
     FX.muted = !!m;
     if (FX.muted) { muteHooks.forEach((h) => h()); FX.stopSfx(); }
+    syncMusic();
   };
+
+  /* ---------- Background music (Lyria 3 loop) ----------
+     Plays from the Play tap, loops, dips under every spoken line, and is
+     silent while muted or while the learner is away. The file itself is
+     mixed quiet (−24 LUFS), because iOS ignores element volume. */
+  const music = { a: null, base: 0.7, on: false, ducked: false, fade: null };
+  FX.loadMusic = (url, vol = 0.7) => {
+    const a = new Audio(url);
+    a.loop = true; a.preload = "auto"; a.volume = 0;
+    music.a = a; music.base = vol;
+  };
+  /** Call from the Play click (a user gesture). */
+  FX.startMusic = () => {
+    if (!music.a) return;
+    music.on = true;
+    if (!FX.muted && !isAway()) music.a.play().catch(() => {});
+    syncMusic();
+  };
+  function duck(on) { music.ducked = on; syncMusic(); }
+  function syncMusic() {
+    const a = music.a;
+    if (!a) return;
+    const target = !music.on || FX.muted || isAway() ? 0 : music.base * (music.ducked ? 0.45 : 1);
+    if (target > 0 && a.paused) a.play().catch(() => {});
+    clearInterval(music.fade);
+    const from = a.volume, t0 = performance.now(), ms = target > from ? 900 : 350;
+    music.fade = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      a.volume = Math.max(0, Math.min(1, from + (target - from) * k));
+      if (k >= 1) { clearInterval(music.fade); if (target === 0) a.pause(); }
+    }, 30);
+  }
 
   /* ---------- Sound effects (looping water) ----------
      Plain <audio> elements so it also works when index.html is opened from
@@ -377,6 +476,8 @@
       raf = requestAnimationFrame(step);
     }
   };
+
+  if (synth) synth.cancel();      // clear a voice left over from a previous page
 
   window.FX = FX;
 })();

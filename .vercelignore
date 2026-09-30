@@ -2,3 +2,9 @@
 Integers_LBD_assets/
 .vscode/
 .DS_Store
+tools/
+# Story source art: the game loads assets/story/*.jpg (web copies) and the two bubble PNGs
+assets/scene_p*_background_clean.png
+assets/dialogue_p*.png
+assets/asset_p07_overlay_*.png
+assets/asset_p08_overlay_*.png

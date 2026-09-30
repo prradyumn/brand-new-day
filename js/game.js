@@ -2,20 +2,20 @@
    game.js — flow + interaction for "Integers: Rise and Fall"
 
    Flow (see CONTEXT.md for the full walkthrough):
-     Start → Tutorial [T0 T1 T2] → TR1 → Level 1 [Q1…Q6]
-           → TR2 (equation panel) → Level 2 [A1…A5] → Level 3 [S1…S5] → End
+     Start → How to Play [H1…H5, guided demo]
+           → Level 1 [L1T tutorial, TR1, Q1…Q7]
+           → Level 2 [teaching P1…P7, TR2, A0 tutorial, A1…A6, E2 Level Complete]
+           → Level 3 [S0, R2…R6, B0 tutorial, B1…B6 keypad only]
+           → Story End [Z1…Z5] → End screen
 
-   The tutorial is a guided demo: the frosted-glass spotlight moves
-   narrator → tank → keypad, and a hand drags the marker and types the
-   answer by itself. From TR1 on there is no blur and the learner plays.
+   Blur/spotlight: How to Play and the Level 1 tutorial (`guided`). From TR1
+   on there is no blur and no full-size character.
 
-   Each question:
-     1. NARRATE  – VO plays (tutorial: spotlight on the narrator box).
-     2. MARKER   – learner drags the marker (or taps ▲/▼). After it rests
-                   `settleMs` it is checked. (Tutorial: the hand drags it.)
-     3. ENTRY    – (if q.entry) learner types the level on the keypad and
-                   presses Check. (Tutorial: the hand types it.)
-     4. CELEBRATE– ✓, sparkle, "Water Level Marked!", confetti.
+   A question has up to two parts, each with its own VO, OST, correct line,
+   wrong-answer ladder and inactivity line (straight from the CSV):
+     lever  – learner moves the marker/lever; checked after it rests `settleMs`
+     entry  – learner types the level on the keypad and presses Check
+   Level 3 has only the entry part; the lever then moves by itself.
    All dialogue and on-screen text comes from data.js (the CSV).
    ===================================================================== */
 (function () {
@@ -38,15 +38,20 @@
   /* Spotlight holes for the focus layer */
   const HOLES = {
     narr:   { x: 12,   y: 6,   w: 1089, h: 160 },
-    char:   { x: 20,   y: 318, w: 450,  h: 755 },
-    tank:   { x: 1092, y: 26,  w: 738,  h: 1064 },   // starts right of the narrator banner (ends x 1090)
+    tank:   { x: 1094, y: 26,  w: 736,  h: 1064 },   // starts right of the narrator box; ▲ / ▼ are lifted above the glass (lever-lit)
     padTut: { x: 196,  y: 250, w: 656,  h: 716 },
-    plate:  { x: 272,  y: 250, w: 530,  h: 196 },
-    gate:   { x: 306,  y: 460, w: 468,  h: 160 }
+    gate:   { x: 289.5, y: 460, w: 468,  h: 160 }
   };
   // Two identical holes cancel out under evenodd, so unused slots get a
   // 2×2 px hole parked off-stage (keeps the path shape stable for transitions).
   const NO_HOLE = { x: -40, y: -40, w: 2, h: 2 };
+
+  /* Who is speaking: banner avatar, full-size art (guided steps) and voice pitch */
+  const SPEAKERS = {
+    guddu:    { full: "assets/guddu-full.png", pitch: 1.0 },
+    pari:     { full: "assets/pari-full.png",  pitch: 1.35 },
+    narrator: { full: null,                    pitch: 1.05 }
+  };
 
   /* ---------------- DOM ---------------- */
   const el = {
@@ -59,10 +64,12 @@
     water: $("water"), pipeIn: $("pipeIn"), pipeOut: $("pipeOut"),
     strip: $("scaleStrip"), countLine: $("countLine"),
     marker: $("marker"), btnUp: $("btnUp"), btnDown: $("btnDown"),
-    fx: $("fxLayer"), confetti: $("confetti"), marked: $("markedBadge"),
+    fx: $("fxLayer"), confetti: $("confetti"), marked: $("markedBadge"), medal: $("medal"),
     gateBtn: $("gateBtn"), progress: $("progress"), paused: $("paused"),
     btnMute: $("btnMute"), startScreen: $("startScreen"), endScreen: $("endScreen"), hand: $("hand"),
-    under: $("under")
+    under: $("under"),
+    story: $("story"), shots: [...document.querySelectorAll("#story .shot")], caption: $("caption"),
+    bubble: $("bubble"), bubbleImg: document.querySelector("#bubble img"), bubbleText: $("bubbleText")
   };
 
   /* ---------------- State ---------------- */
@@ -71,15 +78,19 @@
     level: 2,            // marker/water level
     view: 0,             // centre level of the visible scale window
     q: null,             // current question
-    phase: "idle",       // idle | narrate | marker | entry | feedback | gate
+    part: null,          // current part of the question (q.lever or q.entry)
+    area: null,          // spotlight of the current part: "tank" | "pad"
+    phase: "idle",       // idle | narrate | demo | marker | entry | feedback | gate
+    speaker: "guddu",
     markerEnabled: false,
     dragging: false,
     countFrom: null,     // level the dashed count line starts from
-    water: null,         // fixed water level (tutorial); null = water follows the marker
+    water: null,         // fixed water level; null = water follows the marker
     entry: "",
+    wrong: 0,            // wrong attempts in the current part
     gate: null,          // current transition step
-    guided: false,       // spotlight/blur + character (tutorial steps that introduce something new)
-    eqLive: false,       // equation follows the marker (CSV Level 2 Q1)
+    guided: false,       // spotlight/blur + character
+    eqLive: false,       // equation follows the marker (Level 2 tutorial)
     labels: {}, ticks: {}, tticks: {},
     timers: { settle: null, idle: null, edge: null, pipeIn: null, pipeOut: null },
     resolveMarker: null, resolveEntry: null, resolveGate: null
@@ -87,17 +98,13 @@
 
   window.__GAME_STATE = S; // exposed for debugging / automated tests
 
-  // Spotlight + character only where the tutorial introduces something new (T0, T1);
-  // a step can opt out with `spotlight: false` (T2 repeats the same walk-through).
-  const isGuided = (step) => !!step && step.section === "tutorial" && step.spotlight !== false;
-  S.guided = isGuided(DATA.steps[0]);
-
   // QA: ?step=ID starts the game at that step (see the level jumper below)
   const START_ID = new URLSearchParams(location.search).get("step");
   const START_INDEX = Math.max(0, DATA.steps.findIndex((s) => s.id === START_ID));
 
   FX.lang = CFG.speechLang;
   FX.loadSfx({ fill: "assets/sfx/water-fill.mp3", drain: "assets/sfx/water-drain.mp3" });
+  FX.loadMusic("assets/music/bg-loop.mp3", 0.7);   // Lyria 3 instrumental loop (tools/generate-audio.mjs --music)
   // One-shots (Mixkit free licence, trimmed so each starts on its first sound — see CONTEXT.md §7)
   FX.loadShots({
     key:      { url: "assets/sfx/key.wav",      vol: 0.55, pool: 4 },  // keypad digits, ±, ⌫
@@ -119,26 +126,38 @@
   /* =================================================================
      Stage scaling
      ================================================================= */
+  /* CSS zoom where supported: a scale() transform makes Chrome capture the
+     frosted-glass backdrop (focus layer, start/end screens) at the wrong size,
+     so part of the game showed up mirrored behind the blur. The #viewport grid
+     centres the zoomed stage. Browsers without zoom get the transform. */
+  const USE_ZOOM = !!(window.CSS && CSS.supports && CSS.supports("zoom", "0.5"));
+  el.stage.classList.toggle("zoomed", USE_ZOOM);
   function fitStage() {
     const W = window.innerWidth, H = window.innerHeight;
     const s = Math.min(W / 1920, H / 1080);
     S.scale = s;
-    el.stage.style.transform = `translate(${(W - 1920 * s) / 2}px, ${(H - 1080 * s) / 2}px) scale(${s})`;
+    if (USE_ZOOM) el.stage.style.zoom = s;
+    else el.stage.style.transform = `translate(${(W - 1920 * s) / 2}px, ${(H - 1080 * s) / 2}px) scale(${s})`;
   }
+  /** On-screen px per stage px, measured (the same for zoom and transform). */
+  const stageK = (r) => r.width / 1920 || S.scale;
   window.addEventListener("resize", fitStage);
   // Older browsers without `overflow: clip`: never let the stage scroll itself
   el.stage.addEventListener("scroll", () => { el.stage.scrollTop = 0; el.stage.scrollLeft = 0; });
 
   function toStage(e) {
     const r = el.stage.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / S.scale, y: (e.clientY - r.top) / S.scale };
+    const k = stageK(r);
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k };
   }
 
   /* =================================================================
      Formatting
      ================================================================= */
   const fmt = (n) => (n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "0");
-  const term = (n) => (n === 0 ? "0" : `(${fmt(n)})`);   // CSV style: 0, (+2), (−3)
+  // CSV equation notation: "0 + 3", "(+2) + 3", "(−2) + (−3)", "(+3) − 5"
+  const termA = (n) => (n === 0 ? "0" : `(${fmt(n)})`);
+  const termB = (n) => (n < 0 ? `(${fmt(n)})` : String(n));
 
   /* =================================================================
      Scale + water + marker rendering
@@ -228,7 +247,7 @@
     render();
     FX.sfx("tick");                       // a small bloop for every level counted
     if (S.water === null) waterFlow(dir); // water only moves when it follows the marker
-    if (S.eqLive) renderEq(S.q, { moved: L - S.q.start });
+    if (S.eqLive) renderEq(S.q, { moved: L - S.q.start });   // "0 + 1 → 0 + 2 → 0 + 3"
     return true;
   }
 
@@ -249,17 +268,6 @@
     if (instant) { void el.water.offsetWidth; el.water.classList.remove("instant"); }
   }
 
-  /** Raise/lower the fixed water one level at a time, with the pipe running. */
-  async function animateWater(L, stepMs = 450) {
-    while (S.water !== L) {
-      const dir = Math.sign(L - S.water);
-      S.water += dir;
-      render();
-      waterFlow(dir);
-      await FX.sleep(stepMs);
-    }
-  }
-
   function flowPipe(which) {
     const img = which === "in" ? el.pipeIn : el.pipeOut;
     const key = which === "in" ? "pipeIn" : "pipeOut";
@@ -268,10 +276,11 @@
     S.timers[key] = setTimeout(() => { img.src = `assets/pipe-${which}-dry.png`; }, 900);
   }
 
-  /** Move the marker one level at a time (used by animations/feedback). */
-  async function animateTo(L, stepMs = 240) {
+  /** Move the marker one level at a time. `zeroGlow`: 0 lights up as it is crossed. */
+  async function animateTo(L, stepMs = 240, zeroGlow = false) {
     while (S.level !== L) {
       setLevel(S.level + Math.sign(L - S.level));
+      if (zeroGlow && S.level === 0) { pulseLevel(0); S.labels[0].classList.add("lit"); setTimeout(() => S.labels[0].classList.remove("lit"), 1400); }
       await FX.sleep(stepMs);
     }
   }
@@ -303,24 +312,26 @@
     ring.classList.toggle("on", !!show);
   }
   function focusOn(key) {
-    if (key && !S.guided) key = null;   // the spotlight is only used in T0 and T1
+    if (key && !S.guided) key = null;   // the spotlight is only used in guided steps
     if (!key) {
       S.focusKey = null;
+      el.stage.classList.remove("lever-lit");
       el.focus.classList.remove("on");
       el.ring0.classList.remove("on"); el.ring1.classList.remove("on");
       return;
     }
-    // One highlight at a time: the second slot always stays parked (NO_HOLE)
+    // Usually one highlight at a time: the second slot stays parked (NO_HOLE)
     // so the path keeps the same shape and the hole animates between targets.
     const sets = {
-      narr: [HOLES.narr, NO_HOLE],   // character sits above the glass layer
-      narrOnly: [HOLES.narr, NO_HOLE],
+      narr: [HOLES.narr, NO_HOLE],
       tank: [HOLES.tank, NO_HOLE],
       pad: [HOLES.padTut, NO_HOLE],
-      plate: [HOLES.plate, NO_HOLE],
+      padTank: [HOLES.padTut, HOLES.tank],   // How to Play step 5: "Both glow"
       gate: [HOLES.gate, NO_HOLE]
     };
     const [a, b] = sets[key];
+    // ▲ / ▼ poke out left of the tank spotlight: raise them above the glass so they stay sharp and pressable
+    el.stage.classList.toggle("lever-lit", key === "tank" || key === "padTank");
     el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(a)} ${rr(b)}")`;
     el.focus.style.webkitClipPath = el.focus.style.clipPath;
     el.focus.classList.add("on");
@@ -328,14 +339,20 @@
     S.focusKey = key;
     placeRing(el.ring0, a, true);
     if (moved) FX.flash(el.ring0, "sweep", 1700);
-    placeRing(el.ring1, b, false);
+    placeRing(el.ring1, b, b !== NO_HOLE);
   }
 
   /* =================================================================
      Narrator
      ================================================================= */
+  function setSpeaker(who) {
+    S.speaker = SPEAKERS[who] ? who : "guddu";
+  }
   function setAvatar(mood) {
-    const src = `assets/guddu-${mood}.png`;
+    const who = S.speaker;
+    el.avatar.classList.toggle("none", who === "narrator");
+    if (who === "narrator") return;
+    const src = who === "pari" ? "assets/pari-happy.png" : `assets/guddu-${mood || "happy"}.png`;
     if (!el.avatar.src.endsWith(src)) {
       el.avatar.src = src;
       FX.flash(el.avatar, "swap", 600);
@@ -344,39 +361,48 @@
   function setBanner(text, mood) {
     el.bannerText.textContent = text;
     el.bannerText.classList.toggle("long", text.length > 70);
-    if (mood) setAvatar(mood);
+    setAvatar(mood);
     FX.flash(el.banner, "speak", 400);
   }
+  const speak = (text) => FX.speak(text, { pitch: SPEAKERS[S.speaker].pitch, speaker: S.speaker });   // speaker picks the recorded clip
+  /** Feedback line (always Guddu Bhaiya). */
   async function say(text, mood) {
+    setSpeaker("guddu");
     setBanner(text, mood);
     el.character.classList.add("talk");
-    await FX.speak(text);
+    await speak(text);
     el.character.classList.remove("talk");
   }
-  /** Feedback line: the spotlight moves to the narrator box while Guddu talks,
-      then returns to whatever was highlighted before (unless the flow moved on). */
+  /** Feedback line in a guided step: the spotlight moves to the narrator box while
+      Guddu talks, then returns to whatever was highlighted before. */
   async function sayFocused(text, mood) {
     const back = S.focusKey;
-    focusOn("narrOnly");
+    focusOn("narr");
     await say(text, mood);
-    if (back && S.focusKey === "narrOnly") focusOn(back);
+    if (back && S.focusKey === "narr") focusOn(back);
   }
 
-  /** Full narrator moment: glass blur on everything except the narrator. */
-  async function narrate(text, { character = S.guided, mood = "happy" } = {}) {
+  /** Narrator moment. In guided steps the glass blurs everything except the
+      narrator box, and the speaker slides in full size. */
+  async function narrate(text, { speaker = "guddu", mood = "happy" } = {}) {
     S.phase = "narrate";
+    setSpeaker(speaker);
     setBanner(text, mood);
-    if (character) el.character.classList.add("in", "talk");
-    focusOn(character ? "narr" : "narrOnly");
+    const full = S.guided && SPEAKERS[S.speaker].full;
+    if (full) {
+      if (!el.character.src.endsWith(full)) el.character.src = full;
+      el.character.classList.add("in", "talk");
+    }
+    focusOn("narr");
     await FX.sleep(350);
-    await FX.speak(text);           // always plays to the end (no tap-to-skip)
+    await speak(text);              // always plays to the end (no tap-to-skip)
     el.character.classList.remove("talk");
     await FX.sleep(250);
     el.character.classList.remove("in");
   }
 
   /* =================================================================
-     Inactivity
+     Inactivity (CSV "Inactivity VO / Instruction" + "Inactivity Animation")
      ================================================================= */
   function stopIdle() { clearTimeout(S.timers.idle); }
   function resetIdle() {
@@ -385,17 +411,16 @@
     S.timers.idle = setTimeout(onIdle, CFG.inactivityMs);
   }
   async function onIdle() {
-    const q = S.q;
-    if (S.phase === "marker" && q) {
+    const q = S.q, p = S.part;
+    if ((S.phase === "marker" || S.phase === "entry") && q && p && p.idle) {
+      const phase = S.phase;
       S.phase = "feedback";
       setMarkerEnabled(false);
-      await sayFocused(q.idle.text, "think");
-      await runFx(q.idle.fx, q, q.idle);
-      setBanner(q.ost, "happy");
-      S.phase = "marker";
-      setMarkerEnabled(true);
-    } else if (S.phase === "entry") {
-      FX.flash(el.panel, "nudge", 2600); // the CSV has no inactivity line for the keypad: animation only
+      await sayFocused(p.idle.text, "think");
+      await runFx(p.idle.fx, q, p.idle);
+      setBanner(p.ost, "happy");
+      S.phase = phase;
+      if (phase === "marker") setMarkerEnabled(true);
     } else if (S.phase === "gate" && S.gate) {
       const step = S.gate;
       await sayFocused(step.idle.text, "happy");
@@ -487,37 +512,47 @@
   }
 
   async function markerWrong() {
-    const q = S.q;
+    const q = S.q, p = S.part;
+    S.wrong++;
+    FX.flash(el.marker, "shake", 500);
+    FX.sfx("wrong");
+    if (!p.wrong) {                    // CSV gives no incorrect feedback (tutorial): shown, not spoken
+      FX.badge(el.fx, 1500, Math.max(200, Math.min(880, levelY(S.level))), false);
+      resetIdle();
+      return;
+    }
     S.phase = "feedback";
     stopIdle();
     setMarkerEnabled(false);
-    S.wrongMarker = (S.wrongMarker || 0) + 1;
-    const fb = q.wrong[Math.min(S.wrongMarker, q.wrong.length) - 1];
-    FX.flash(el.marker, "shake", 500);
-    FX.sfx("wrong");
+    const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
     await sayFocused(fb.text, "sad");
     await runFx(fb.fx, q, fb);
-    setBanner(q.ost, "happy");
+    setBanner(p.ost, "happy");
     S.phase = "marker";
     setMarkerEnabled(true);
     resetIdle();
   }
 
-  /** Feedback / inactivity animations named in data.js (fx field).
-      Each one does only what its CSV "Incorrect Animation" / "Inactivity Animation"
-      cell describes. The marker goes back to the start only for "return". */
+  /* Feedback / inactivity animations named in data.js (fx field).
+     Each one does only what its CSV "Incorrect Animation" / "Inactivity Animation"
+     cell describes. The marker goes back to the start only for "return". */
+  const PAD_FX = new Set(["pulseKeys", "pulsePadKeys", "pulsePad"]);
   async function runFx(fx, q, opts = {}) {
     const dir = Math.sign(q.target - q.start) || 1;
     const next = q.start + dir;                      // first step toward the target
+    const signKey = q.target > 0 ? "+" : q.target < 0 ? "-" : null;
+    // Guided (Level 1 tutorial): move the spotlight to where the animation plays
+    if (S.guided) focusOn(PAD_FX.has(fx) ? "pad" : "tank");
     switch (fx) {
+      /* ----- lever / scale ----- */
       case "return":                                 // "Marker returns to its starting position."
         if (S.level !== q.start) await animateTo(q.start, 200);
         break;
-      case "pulseZero":                              // "The 0 mark gently pulses." / "0 briefly glows"
+      case "pulseZero":                              // "The 0 mark gently pulses."
         pulseLevel(0);
         await FX.sleep(1400);
         break;
-      case "nudge": {                                // "Marker gives a small nudge toward 0."
+      case "nudge": {                                // "Marker gives a small nudge towards 0."
         const toward = Math.sign(q.target - S.level) || dir;
         const px = -toward * 34;
         el.marker.animate(
@@ -530,59 +565,73 @@
       }
       case "glowUp":                                 // "Up arrow briefly glows."
         FX.flash(el.btnUp, "glow", 3000); await FX.sleep(1500); break;
-      case "glowDown":                               // "Down arrow briefly glows."
-        FX.flash(el.btnDown, "glow", 3000); await FX.sleep(1500); break;
-      case "glowDirUp":                              // "Upward direction on the scale glows."
+      case "glowDirUp":                              // "Upward direction glows."
         await glowDirection(q.start, 1); break;
-      case "glowDirDown":                            // "Down direction glows."
+      case "glowDirDown":                            // "Downward direction glows."
         await glowDirection(q.start, -1); break;
-      case "pulseUpFirst":                           // "Up arrow and first step pulse."
-        FX.flash(el.btnUp, "glow", 3000); pulseLevel(q.start + 1);
+      case "pulseArrowNext":                         // "Up arrow and +1 pulse." / "+5 and down arrow pulse."
+        FX.flash(dir > 0 ? el.btnUp : el.btnDown, "glow", 3000); pulseLevel(next);
         await FX.sleep(1500); break;
-      case "pulseDownFirst":                         // "Down arrow and first step pulse."
-        FX.flash(el.btnDown, "glow", 3000); pulseLevel(q.start - 1);
+      case "pulseMarkerNext":                        // "Lever and +3 gently pulse."
+        pulseMarker(); pulseLevel(next);
         await FX.sleep(1500); break;
-      case "pulseMarkerNext":                        // "Marker and next level above it pulse."
-        el.marker.animate(
-          [{ transform: "scale(1)" }, { transform: "scale(1.22)" }, { transform: "scale(1)" }],
-          { duration: 900, iterations: 3, easing: "ease-in-out" }
-        );
-        pulseLevel(next);
-        await FX.sleep(1500); break;
-      case "pulseNext":                              // "First downward step pulses." / "−2 gently pulses."
-        pulseLevel(next);
-        await FX.sleep(1500); break;
-      case "countSteps":                             // "(0 and) the steps highlight / pulse one by one."
-        await countSteps(q, !!opts.withStart, !!opts.pulse);
+      case "countSteps":                             // "+3, +4, +5 highlight one by one."
+        await countPath(q.start, q.target, !!opts.withStart);
         break;
-      case "pulseSteps":                             // "Three levels above 0 gently pulse."
-        for (let L = next; L !== q.target + dir; L += dir) pulseLevel(L);
-        await FX.sleep(1800); break;
       case "pulseStart":                             // "Starting level +2 pulses."
         pulseLevel(q.start);
         await FX.sleep(1500); break;
-      case "highlightStart":                         // "0 highlights as the starting level."
-        S.labels[q.start].classList.add("lit");
-        await FX.sleep(1600);
-        S.labels[q.start].classList.remove("lit"); break;
-      case "pulseStartEq":                           // "Starting level +3 and equation pulse."
-        pulseLevel(q.start); FX.flash(el.eqPanel, "nudge", 2600);
+      /* ----- keypad part: pointing at the answer ----- */
+      case "pulseTarget":                            // "0 on the scale pulses."
+        pulseLevel(q.target);
         await FX.sleep(1500); break;
-      case "pulseEqTerms":                           // "0 and (+3) in the equation gently pulse."
-        [el.eqA, el.eqB].forEach((n) => FX.flash(n, "eqpulse", 2800));
+      case "pulseMarker":                            // "Marker at +2 pulses."
+        pulseMarker();
         await FX.sleep(1500); break;
-      case "glowEqOp":                               // "− (−2) in the equation glows."
-        [el.eqOp, el.eqB].forEach((n) => FX.flash(n, "eqglow", 2600));
+      case "glowMarker":                             // "Marker at 0 glows."
+        FX.flash(el.marker, "glowing", 2800);
         await FX.sleep(1500); break;
-      case "pulseEqOpDirUp":                         // "−(−2) and the upward side of the scale gently pulse."
-        [el.eqOp, el.eqB].forEach((n) => FX.flash(n, "eqpulse", 2800));
-        await glowDirection(q.start, 1); break;
+      case "glowTarget":                             // "+2 on the scale glows."
+        S.labels[q.target].classList.add("lit");
+        await FX.sleep(1800);
+        S.labels[q.target].classList.remove("lit"); break;
+      case "pulseKeys":                              // "+ and 2 buttons pulse." / "0 button on the dial pulses."
+        answerKeys(q.target).forEach((k) => FX.flash(k, "keypulse", 2800));
+        await FX.sleep(1500); break;
+      case "pulsePadKeys":                           // "Dial and 0 button gently pulse."
+        FX.flash(el.panel, "nudge", 2600);
+        answerKeys(q.target).forEach((k) => FX.flash(k, "keypulse", 2800));
+        await FX.sleep(1500); break;
+      case "pulsePad":                               // "Dial pad gently pulses."
+        FX.flash(el.panel, "nudge", 2600);
+        await FX.sleep(1500); break;
+      case "pulseTargetPad":                         // "+3 on the scale and dial pad gently pulse."
+        pulseLevel(q.target); FX.flash(el.panel, "nudge", 2600);
+        await FX.sleep(1500); break;
+      case "pulseTargetSign":                        // "+7 on the scale and + button pulse."
+        pulseLevel(q.target);
+        if (signKey) FX.flash(keyNode(signKey), "keypulse", 2800);
+        await FX.sleep(1500); break;
     }
+    if (S.guided && S.area) focusOn(S.area);
+  }
+
+  const keyNode = (k) => document.querySelector(`.key[data-k="${k}"]`);
+  /** The keys that type an answer: sign (none for 0) + digits. */
+  function answerKeys(n) {
+    const keys = n === 0 ? [] : [n > 0 ? "+" : "-"];
+    return keys.concat([...String(Math.abs(n))]).map(keyNode);
   }
 
   /** Pulse one level of the scale (label + both ticks). */
   function pulseLevel(L) {
     [S.labels[L], S.ticks[L], S.tticks[L]].forEach((n) => n && FX.flash(n, "pulse", 2800));
+  }
+  function pulseMarker() {
+    el.marker.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(1.22)" }, { transform: "scale(1)" }],
+      { duration: 900, iterations: 3, easing: "ease-in-out" }
+    );
   }
 
   /** A glow that travels along the scale from `from` in direction `dir`. */
@@ -597,20 +646,19 @@
     levels.forEach((L) => [S.labels[L], S.ticks[L]].forEach((n) => n.classList.remove("dirglow")));
   }
 
-  /** Highlight each step toward the target one by one (optionally the start mark first). */
-  async function countSteps(q, withStart, pulse) {
-    const dir = Math.sign(q.target - q.start);
+  /** Highlight each level from `from` toward `to` one by one (optionally the start mark first). */
+  async function countPath(from, to, withStart = false) {
+    const dir = Math.sign(to - from);
     const path = [];
-    for (let L = withStart ? q.start : q.start + dir; L !== q.target + dir; L += dir) path.push(L);
+    for (let L = withStart ? from : from + dir; L !== to + dir; L += dir) path.push(L);
     // make sure the whole path is visible
-    ensureVisible(q.target); ensureVisible(q.start); render();
+    ensureVisible(to); ensureVisible(from); render();
     await FX.sleep(300);
-    for (let i = 0; i < path.length; i++) {
-      const lab = S.labels[path[i]];
+    for (const L of path) {
+      const lab = S.labels[L];
       if (!lab) continue;
       lab.classList.add("lit");
-      if (pulse) pulseLevel(path[i]);
-      if (path[i] !== q.start) FX.sparkle(el.fx, LABEL_X, levelY(path[i]), 6, 50);
+      if (L !== from) FX.sparkle(el.fx, LABEL_X, levelY(L), 6, 50);
       await FX.sleep(520);
     }
     await FX.sleep(700);
@@ -639,29 +687,55 @@
   }
   function setMode(mode) {
     const lvl = mode === "lvl";
-    [el.panel, el.plate, el.connector].forEach((n) => n.classList.toggle("lvl", lvl));
+    [el.panel, el.plate, el.connector, el.marked].forEach((n) => n.classList.toggle("lvl", lvl));
   }
 
-  /* Equation panel (Level 2/3): "a op (b) = ?" in the CSV's notation.
-     { moved } shows the live form while the lever moves ("0 + (+1)"),
-     { answer } completes it ("0 + (+3) = +3"). */
+  /* Equation panel (Level 2/3): "a op b = ?" in the CSV's notation.
+     { moved } shows the live form while the lever moves ("0 + 1"),
+     { answer } completes it ("0 + 3 = +3"). */
   function renderEq(q, { moved = null, answer = null } = {}) {
     const e = q.eq, live = moved !== null && moved !== 0;
-    el.eqA.textContent = term(e.a);
+    el.eqA.textContent = termA(e.a);
     el.eqOp.textContent = e.op;
-    el.eqB.textContent = `(${fmt(live ? moved : e.b)})`;
+    el.eqB.textContent = termB(live ? moved : e.b);
     el.eqEq.classList.toggle("gone", live);
     el.eqAns.classList.toggle("gone", live);
     el.eqAns.textContent = answer !== null ? fmt(answer) : "?";
+    fitEq();
   }
-  function completeEq(q) {                        // "Equation completes: 0 + (+3) = +3."
+  /** Level 2 teaching rows: the row's OST equation, written as the CSV writes it
+      ("1 + 2 = ?", "3 − 5 = −2"). The panel only ever shows equations. */
+  function showTeachEq(text) {
+    const m = /^(.+?) ([+−]) (.+?) = (.+)$/.exec(text);
+    if (!m) return;
+    const was = el.eqPanel.textContent;
+    el.eqA.textContent = m[1]; el.eqOp.textContent = m[2]; el.eqB.textContent = m[3];
+    el.eqEq.classList.remove("gone"); el.eqAns.classList.remove("gone");
+    el.eqAns.textContent = m[4];
+    if (el.eqPanel.classList.contains("hidden")) showEqPanel();
+    else if (was !== el.eqPanel.textContent) FX.flash(el.eqPanel, "complete", 1000);
+    fitEq();
+  }
+  /** Keep the equation inside the strip: shrink the font only if it would overflow. */
+  function fitEq() {
+    const p = el.eqPanel;
+    p.style.fontSize = "";
+    if (p.classList.contains("hidden")) return;
+    // centred flex content overflows on both sides, so add up the parts (layout px, unaffected by the stage scale)
+    const parts = [...p.children].filter((n) => n.offsetWidth > 0);
+    const gap = parseFloat(getComputedStyle(p).columnGap) || 0;
+    const need = parts.reduce((w, n) => w + n.offsetWidth, 0) + gap * (parts.length - 1);
+    const room = p.clientWidth - 16;                                  // a little air inside the strip
+    if (need > room) p.style.fontSize = Math.floor(parseFloat(getComputedStyle(p).fontSize) * room / need) + "px";
+  }
+  function completeEq(q) {                        // "Equation completes: (+2) + 3 = +5."
     renderEq(q, { answer: q.target });
     FX.flash(el.eqPanel, "complete", 1000);
   }
   function showEqPanel() {
-    if (!el.eqPanel.classList.contains("hidden")) return;
     el.eqPanel.classList.remove("hidden");
     FX.flash(el.eqPanel, "appear", 900);
+    fitEq();
   }
   function entryDisplay() {
     setPlate(S.entry === "" ? "?" : S.entry.replace("-", "−"));
@@ -691,28 +765,37 @@
     S.entry = S.entry.slice(0, -1);
     entryDisplay();
   }
-  async function checkEntry() {
+  function checkEntry() {
     if (S.phase !== "entry") return;
     resetIdle();
     FX.sfx("button");
     const m = /^([+-]?)(\d+)$/.exec(S.entry);
-    if (!m) { FX.flash(el.plate, "shake", 500); return; }
+    if (!m) { FX.flash(el.plate, "shake", 500); return; }    // nothing to check yet
     const val = (m[1] === "-" ? -1 : 1) * parseInt(m[2], 10);
-    const signOk = !(CFG.requireSignForPositive && val > 0 && m[1] !== "+");
-    if (val === S.q.target && signOk) {
-      S.resolveEntry && S.resolveEntry();
-    } else {
-      entryWrong();
-    }
+    // 0 has no sign; positive answers need "+" (CSV: "presses + and 2")
+    const signOk = val === 0 || !(CFG.requireSignForPositive && val > 0 && m[1] !== "+");
+    if (val === S.q.target && signOk) S.resolveEntry && S.resolveEntry();
+    else entryWrong();
   }
-  /** Wrong keypad answer. The CSV gives no line for this, so it is shown, not spoken. */
-  function entryWrong() {
-    S.wrongEntry = (S.wrongEntry || 0) + 1;
+  /** Wrong keypad answer: the CSV "Incorrect Feedback 1/2/3" ladder for the keypad row
+      (the tutorials of Level 2 and 3 have none: shown, not spoken). */
+  async function entryWrong() {
+    const q = S.q, p = S.part;
+    S.wrong++;
     FX.sfx("wrong");
     FX.flash(el.plate, "shake", 500);
-    FX.badge(el.fx, 790, 350, false);
+    const pp = stagePt(el.plate);
+    FX.badge(el.fx, pp.x + 250, pp.y, false);                     // ✗ on the display's right edge
     S.entry = "";
     entryDisplay();
+    if (!p.wrong) { resetIdle(); return; }
+    S.phase = "feedback";
+    stopIdle();
+    const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
+    await sayFocused(fb.text, "sad");
+    await runFx(fb.fx, q, fb);
+    setBanner(p.ost, "happy");
+    S.phase = "entry";
     resetIdle();
   }
 
@@ -730,11 +813,12 @@
   });
 
   /* =================================================================
-     Tutorial demo — a hand shows the interaction; nothing waits for input
+     How to Play demo hand — shows the interaction; nothing waits for input
      ================================================================= */
   function stagePt(node, fx = 0.5, fy = 0.5) {
     const r = node.getBoundingClientRect(), st = el.stage.getBoundingClientRect();
-    return { x: (r.left - st.left + r.width * fx) / S.scale, y: (r.top - st.top + r.height * fy) / S.scale };
+    const k = stageK(st);
+    return { x: (r.left - st.left + r.width * fx) / k, y: (r.top - st.top + r.height * fy) / k };
   }
   async function handTo(x, y, ms = 650) {
     if (!el.hand.classList.contains("on")) {        // first appearance: slide in from below-right
@@ -747,7 +831,7 @@
     el.hand.style.left = x + "px"; el.hand.style.top = y + "px";
     await FX.sleep(ms);
   }
-  const handHide = () => el.hand.classList.remove("on");
+  const handHide = () => el.hand.classList.remove("on", "flip");
   async function handTap(node) {
     const p = stagePt(node);
     await handTo(p.x, p.y);
@@ -758,16 +842,16 @@
     await FX.sleep(350);
   }
   const MARKER_GRIP_X = 1152;                      // stage x of the marker's grip
-  /** The hand moves the marker to the target: drags it (T0) or taps ▲ / ▼ (T1, T2). */
-  async function demoMarker(q) {
-    if (q.demoMove === "tap") return demoTapButtons(q);
+  /** The hand drags the marker to level `to`. */
+  async function demoDrag(to) {
+    handHide(); await FX.sleep(200);
     await handTo(MARKER_GRIP_X, levelY(S.level));
     FX.flash(el.hand, "tap", 400);
     el.marker.classList.add("held");
     await FX.sleep(450);
-    const dir = Math.sign(q.target - S.level);
+    const dir = Math.sign(to - S.level);
     el.hand.style.transition = "top .45s var(--ease-out), opacity .3s";  // same glide as the marker
-    while (S.level !== q.target) {
+    while (S.level !== to) {
       setLevel(S.level + dir);
       el.hand.style.top = levelY(S.level) + "px";
       await FX.sleep(750);
@@ -778,36 +862,19 @@
     handHide();
     await FX.sleep(300);
   }
-  /** The hand taps the green ▲ or red ▼ button once per level. */
-  async function demoTapButtons(q) {
-    const dir = Math.sign(q.target - S.level);
+  /** The hand taps the green ▲ (dir 1) or red ▼ (dir −1) button `times` times. */
+  async function demoTap(dir, times = 1) {
     const btn = dir > 0 ? el.btnUp : el.btnDown;
+    if (el.hand.classList.contains("flip") !== dir < 0) { handHide(); await FX.sleep(300); }
     el.hand.classList.toggle("flip", dir < 0);      // point down from above at ▼ (it sits at the stage's bottom edge)
     const p = stagePt(btn, 0.5, dir > 0 ? 0.55 : 0.42);
     await handTo(p.x, p.y);
-    while (S.level !== q.target) {
+    for (let i = 0; i < times; i++) {
       FX.flash(el.hand, "tap", 400);
       pressLever(btn);
       setLevel(S.level + dir);
-      await FX.sleep(750);
+      await FX.sleep(900);
     }
-    await FX.sleep(300);
-    handHide();
-    await FX.sleep(350);
-    el.hand.classList.remove("flip");
-  }
-
-  /** The hand types the answer (sign, digits) and presses Check. */
-  async function demoEntry(q) {
-    const keys = [q.target < 0 ? "-" : "+", ...String(Math.abs(q.target))];
-    for (const k of keys) {
-      const node = document.querySelector(`.key[data-k="${k}"]`);
-      await handTap(node);
-      applyKey(k);
-    }
-    FX.sfx("button");
-    await handTap(el.btnCheck);
-    handHide();
   }
 
   /* =================================================================
@@ -835,12 +902,17 @@
     anims.forEach((a) => a.cancel());                               // hand the transform back to CSS
   }
 
-  // Which level a step belongs to (a transition belongs to the level it opens)
-  function levelOf(step) {
-    const i = DATA.steps.indexOf(step);
-    const q = step.type === "question" ? step : DATA.steps.slice(i).find((s) => s.type === "question");
-    return q ? q.section : step.id;
+  // Which level a step belongs to. The story end plays on at the Level 3 tank (no dive).
+  const levelOf = (step) => (step.section === "end" ? "level3" : step.section);
+  // Lever level a step starts from: its own start/level, or the next one that has one
+  function levelAt(i) {
+    for (const s of DATA.steps.slice(i)) {
+      if (s.start != null) return s.start;
+      if (s.level != null) return s.level;
+    }
+    return 0;
   }
+  const firstLine = (s) => s.vo || (s.lever && s.lever.vo) || (s.entry && s.entry.vo) || "";
 
   /* Level change: "dive into the tank". The camera (the whole #stage) zooms into
      the water, the screen goes underwater (#under: bubbles + light rays, outside
@@ -906,44 +978,43 @@
   /** Level change: the dive, with the board reset for the step that opens the next level. */
   function levelWipe(step) {
     const i = DATA.steps.indexOf(step);
-    const nq = step.type === "question" ? step : DATA.steps.slice(i).find((s) => s.type === "question");
     S.guided = false;
     focusOn(null);                                                  // no blur layer while the camera moves
     return diveWipe(async () => {
-      S.guided = false;
       focusOn(null);
+      handHide();
       el.character.classList.remove("in", "talk");
       S.countFrom = null;
       el.marker.classList.remove("locked");
       setWater(null);
-      if (nq) jumpTo(nq.start);                                     // new level starts on a settled tank
-      if (nq && nq.entry) setPlate(fmt(nq.start));
-      if (step.type === "question" && nq.eq) renderEq(nq);          // no transition step (Level 2 → 3)
-      setBanner(step.vo, "happy");                                  // the next line is already up when the drop opens
+      const L = levelAt(i);
+      jumpTo(L);                                                    // new level starts on a settled tank
+      setPlate(step.plateStart || fmt(L));
+      if (step.section === "level2" || step.section === "level3") setMode("lvl");
+      if (step.section === "level3") el.eqPanel.classList.add("hidden");   // the Level 3 challenge appears at R5
+      setSpeaker(step.speaker);
+      setBanner(firstLine(step), "happy");                          // the next line is already up when the camera rises
     });
   }
 
   /* =================================================================
-     Celebration
+     Success (CSV "Correct Animations" + "Success / Confetti after each example")
      ================================================================= */
-  async function celebrate(q) {
-    // CSV: "Small ✓, sparkle and Water Level Marked!" (+ confetti after each example);
-    // T0 is "Small ✓ and sparkle" only; crossing 0 (Q4) gets "slightly stronger sparkle/confetti".
+  async function succeed(q, p, where) {
     setAvatar("happy");
-    const y = levelY(q.target);
-    const small = q.celebrate === "small";
-    FX.sparkle(el.fx, LABEL_X, y, q.crossZero ? 22 : 16, q.crossZero ? 150 : 120);
-    FX.badge(el.fx, 1500, Math.max(200, Math.min(880, y)), true);
+    const atPlate = where === "plate";
+    const pp = atPlate ? stagePt(el.plate) : { x: LABEL_X, y: levelY(q.target) };
+    FX.sparkle(el.fx, pp.x, pp.y, 16, 120);                                     // sparkle
+    FX.badge(el.fx, atPlate ? pp.x + 250 : 1500, Math.max(200, Math.min(880, pp.y)), true);   // small ✓
     FX.sfx("correct");
-    FX.flash(S.labels[q.target], "pulse", 2800);
-    if (!small) {
+    if (p.success === "marked") {                                               // "✓ Sparkle + Water Level Marked!"
       el.marked.querySelector("span").textContent = DATA.ui.marked;
       FX.flash(el.marked, "show", 2300);
       setTimeout(() => FX.sfx("board"), 250);
       setTimeout(() => FX.sfx("confetti"), 120);
-      FX.confetti(el.confetti, { count: q.crossZero ? 150 : 90, x: 820, y: 330, power: q.crossZero ? 1.12 : 1 });
+      FX.confetti(el.confetti, { count: 90, x: 820, y: 330 });
     }
-    await say(q.correct, "happy");
+    await sayFocused(p.correct, "happy");
     await FX.sleep(500);
   }
 
@@ -952,9 +1023,8 @@
      ================================================================= */
   async function runQuestion(q, { flip = false } = {}) {
     S.q = q;
-    S.guided = isGuided(q);
-    if (!S.guided) focusOn(null);        // drop a spotlight left over from the previous step
-    S.wrongMarker = 0; S.wrongEntry = 0;
+    S.guided = !!q.guided;
+    if (!S.guided) focusOn(null);
     S.countFrom = null;
     el.marker.classList.remove("locked");
     setMarkerEnabled(false);
@@ -963,13 +1033,11 @@
     // New question in the same level: the display (and equation) flip over to it
     // while the water re-levels to the new start.
     const showQuestion = () => {
-      if (q.entry && q.section !== "tutorial") setPlate(fmt(q.start));   // "The marker is at +2."
-      else if (flip) setPlate("?");
+      setPlate(q.plateStart || fmt(q.start));
       if (q.eq) renderEq(q);
     };
     const flipping = flip ? flipCards(showQuestion) : (showQuestion(), null);
 
-    // Put the water/marker at the question's start level
     setWater(null);
     if (S.level !== q.start) {
       if (Math.abs(S.level - q.start) <= 4) await animateTo(q.start, 180);
@@ -978,84 +1046,391 @@
     setView(viewFor(q.start));
     render();
     await flipping;
+    if (q.eq && el.eqPanel.classList.contains("hidden")) showEqPanel();
 
-    // Tutorial: the water shows the answer and the learner matches the marker to it
-    if (q.water === "target") setWater(q.target, true);
-    else if (q.water === "animate") setWater(q.start, true);
-
-    if (q.eq) showEqPanel();
-
-    /* 1 ─ Narrator moment */
-    await narrate(q.vo);
-
-    /* 2 ─ Marker phase */
-    setBanner(q.ost, "happy");
-    focusOn(q.eq ? "work" : "tank");
-    if (q.water === "animate") {
-      await FX.sleep(700);            // let the spotlight settle on the tank
-      await animateWater(q.target);
-      await FX.sleep(400);
-    }
-    S.countFrom = q.start;
-    render();
-    await FX.sleep(300);
-    if (q.demo) {                     // tutorial: the hand drags the marker
-      S.phase = "demo";
-      await demoMarker(q);
-    } else {
-      S.phase = "marker";
-      S.eqLive = !!q.liveEq;
-      setMarkerEnabled(true);
-      el.marker.focus({ preventScroll: true });
-      resetIdle();
-      await new Promise((r) => (S.resolveMarker = r));
-      S.resolveMarker = null;
-    }
-    S.eqLive = false;
-    stopIdle();
-    clearTimeout(S.timers.settle);
-    setMarkerEnabled(false);
-    el.marker.classList.add("locked");
-    if (q.eq && !q.entry) completeEq(q);
-    else if (q.eq) renderEq(q);        // back to the full question "0 + (+3) = ?" for the keypad step
-    S.phase = "feedback";
-    FX.sparkle(el.fx, LABEL_X, levelY(q.target), 10, 70);
-    FX.flash(S.labels[q.target], "pulse", 2800);
-    if (q.target === 0) { FX.flash(S.ticks[0], "pulse", 2800); FX.flash(S.tticks[0], "pulse", 2800); }
-
-    /* 3 ─ Entry phase (number plate + keypad) */
-    if (q.entry) {
-      showPlate();
-      showPanel();
-      S.entry = "";
-      entryDisplay();
-      focusOn("pad");
-      await FX.sleep(500);
-      if (q.demo) {                   // tutorial: the hand types the answer
-        S.phase = "demo";
-        await demoEntry(q);
-      } else {
-        S.phase = "entry";
-        resetIdle();
-        await new Promise((r) => (S.resolveEntry = r));
-        S.resolveEntry = null;
-      }
-      stopIdle();
-      S.phase = "feedback";
-      setPlate(fmt(q.target), true);            // "+2 appears on the display."
-      if (q.eq) completeEq(q);
-    }
-
-    /* 4 ─ Celebrate */
-    await celebrate(q);
+    if (q.lever) await leverPart(q, q.lever);
+    if (q.entry) await entryPart(q, q.entry);
 
     S.countFrom = null;
     render();
     markProgress(q.id, true);
   }
 
+  /** Lever part: VO, the learner moves the marker, "Correct! You reached +2." */
+  async function leverPart(q, p) {
+    S.part = p; S.wrong = 0; S.area = "tank";
+    await narrate(p.vo);
+    setBanner(p.ost, "happy");
+    focusOn("tank");
+    S.countFrom = q.start;
+    render();
+    await FX.sleep(300);
+    S.phase = "marker";
+    S.eqLive = !!q.liveEq;
+    setMarkerEnabled(true);
+    el.marker.focus({ preventScroll: true });
+    resetIdle();
+    await new Promise((r) => (S.resolveMarker = r));
+    S.resolveMarker = null;
+    S.eqLive = false;
+    stopIdle();
+    clearTimeout(S.timers.settle);
+    setMarkerEnabled(false);
+    S.phase = "feedback";
+    el.marker.classList.add("locked");                   // "Marker locks at +2."
+    if (q.eq) renderEq(q);                               // back to the full question "0 + 3 = ?" for the keypad step
+    FX.flash(S.labels[q.target], "pulse", 2800);
+    if (q.target === 0) { FX.flash(S.ticks[0], "pulse", 2800); FX.flash(S.tticks[0], "pulse", 2800); }   // "The 0 mark glows briefly."
+    await succeed(q, p, "level");
+  }
+
+  /** Keypad part: VO, the learner types the level and presses Check. */
+  async function entryPart(q, p) {
+    S.part = p; S.wrong = 0; S.area = "pad";
+    showPlate();
+    showPanel();
+    await narrate(p.vo);
+    S.entry = "";
+    entryDisplay();
+    setBanner(p.ost, "happy");
+    focusOn("pad");
+    await FX.sleep(400);
+    S.phase = "entry";
+    resetIdle();
+    await new Promise((r) => (S.resolveEntry = r));
+    S.resolveEntry = null;
+    stopIdle();
+    S.phase = "feedback";
+    setPlate(fmt(q.target), true);                       // "+2 appears on the display (and glows briefly)."
+    if (q.autoLever) {                                   // Level 3: "Lever automatically moves 0 → +1 → … → +4."
+      await FX.sleep(300);
+      S.countFrom = q.start;
+      await animateTo(q.target, 420);
+      el.marker.classList.add("locked");
+    }
+    if (q.eq) completeEq(q);                             // "Equation completes: 0 + 3 = +3."
+    await succeed(q, p, "plate");
+  }
+
+  /* =================================================================
+     How to Play (guided demo)
+     ================================================================= */
+  async function runDemo(step) {
+    S.q = null; S.part = null;
+    S.guided = !!step.guided;
+    if (step.start != null && S.level !== step.start) jumpTo(step.start);
+    if (step.act === "enterNumber") {                    // "Camera shifts to the dial and display screen."
+      S.entry = ""; entryDisplay();
+      showPlate(); showPanel();
+    }
+    if (!step.ostFirst) {
+      await narrate(step.vo, { speaker: step.speaker });
+      setBanner(step.ost, "happy");
+    } else {
+      setSpeaker(step.speaker);
+      setBanner(step.ost, "happy");
+    }
+    S.phase = "demo";
+    switch (step.act) {
+      case "leverUpDown":                                // "Move the lever up or down as shown."
+        focusOn("tank");
+        await FX.sleep(800);
+        for (const d of step.taps) await demoTap(d, 1);
+        await FX.sleep(300);
+        handHide();
+        break;
+      case "leverMark":                                  // "The lever moves along the scale and stops at the new level."
+        focusOn("tank");
+        await FX.sleep(800);
+        S.countFrom = S.level; render();
+        await demoDrag(step.to);
+        el.marker.classList.add("locked");
+        FX.flash(S.labels[step.to], "pulse", 2800);      // highlighted level marks
+        FX.sparkle(el.fx, LABEL_X, levelY(step.to), 10, 70);
+        await FX.sleep(1200);
+        S.countFrom = null; render();
+        break;
+      case "enterNumber":                                // number buttons + display
+        focusOn("pad");
+        await FX.sleep(800);
+        await handTap(keyNode(step.key));
+        applyKey(step.key);
+        await FX.sleep(600);
+        break;
+      case "chooseSign":                                 // "(+ / −) sign buttons … highlighted"
+        focusOn("pad");
+        [keyNode("+"), keyNode("-")].forEach((k) => FX.flash(k, "keypulse", 2800));
+        await FX.sleep(1400);
+        await handTap(keyNode(step.key));
+        applyKey(step.key);
+        await FX.sleep(600);
+        handHide();
+        break;
+      case "check": {                                    // "Check icon glows. The entered number matches the lever position."
+        focusOn("pad");
+        FX.flash(el.btnCheck, "keypulse", 2800);
+        await FX.sleep(1200);
+        FX.sfx("button");
+        await handTap(el.btnCheck);
+        handHide();
+        focusOn("padTank");                              // "Both glow and a tick appears."
+        setPlate(fmt(S.level), true);
+        FX.flash(el.marker, "glowing", 2800);
+        FX.flash(S.labels[S.level], "pulse", 2800);
+        const pp = stagePt(el.plate);
+        FX.sparkle(el.fx, pp.x, pp.y, 16, 120);
+        FX.sparkle(el.fx, LABEL_X, levelY(S.level), 12, 90);
+        FX.badge(el.fx, pp.x + 250, pp.y, true);
+        FX.sfx("correct");
+        await FX.sleep(1600);
+        await narrate(step.vo, { speaker: step.speaker });
+        break;
+      }
+    }
+    S.phase = "idle";
+  }
+
+  /* =================================================================
+     Spoken rows (teaching, Level 3 transition, Level Complete, Story End)
+     ================================================================= */
+  async function runSay(step) {
+    S.q = null; S.part = null;
+    S.guided = false;
+    focusOn(null);
+    if (step.level != null) {                          // teaching rows: the lever (and the display) at the row's level
+      if (S.level !== step.level) await animateTo(step.level, 200);
+      setPlate(fmt(S.level));
+    }
+    const showOst = () => {
+      if (step.ostIn === "eq") { setMode("lvl"); showTeachEq(step.ost); }
+    };
+    if (!step.ostAfter) showOst();
+    await Promise.all([narrate(step.vo, { speaker: step.speaker }), sayFx(step, showOst)]);
+    if (!step.ostIn) setBanner(step.ost, "happy");
+    await FX.sleep(500);
+  }
+
+  /** The animation in each row's "Scene Description" (plays while the line is spoken). */
+  async function sayFx(step, showOst) {
+    const i = DATA.steps.indexOf(step);
+    const nextQ = DATA.steps.slice(i).find((s) => s.type === "question");
+    await FX.sleep(400);
+    switch (step.fx) {
+      case "moveTo":                                     // "The lever moves …" (0 highlighted while crossing)
+        await animateTo(step.to, 480, !!step.zeroGlow);
+        setPlate(fmt(S.level), true);
+        if (step.ostAfter) showOst();                    // "The equation completes."
+        break;
+      case "countSteps":                                 // "… levels highlight one by one."
+        await countPath(step.from, step.to);
+        break;
+      case "riseFall":                                   // "upward and downward arrow, plus and minus symbols"
+        FX.flash(el.btnUp, "glow", 3000);
+        await glowDirection(S.level, 1, 900);
+        FX.flash(el.btnDown, "glow", 3000);
+        await glowDirection(S.level, -1, 900);
+        break;
+      case "levelComplete": {                            // final level glows, dial shows the answer, ✓, confetti
+        pulseLevel(S.level);
+        setPlate(fmt(S.level), true);
+        FX.badge(el.fx, 1500, Math.max(200, Math.min(880, levelY(S.level))), true);
+        el.marked.querySelector("span").textContent = step.ost;       // OST "Level Complete!"
+        FX.flash(el.marked, "show", 2300);
+        FX.sfx("board"); FX.sfx("confetti");
+        FX.confetti(el.confetti, { count: 180, x: 960, y: 420, power: 1.2, spread: 1.3 });
+        break;
+      }
+      case "leverStuck":                                 // "Pari tries to use the lever, but it does not respond."
+        for (let k = 0; k < 2; k++) {
+          pressLever(el.btnUp);
+          FX.flash(el.marker, "shake", 500);
+          await FX.sleep(700);
+        }
+        el.stage.classList.add("lever-off");             // inactive lever from here on
+        break;
+      case "padGlow":                                    // "The dial pad begins to glow."
+        FX.flash(el.panel, "activate", 1300);
+        await FX.sleep(1400);
+        FX.flash(el.panel, "activate", 1300);
+        break;
+      case "keysPulse":                                  // "The sign and number buttons gently pulse."
+        [keyNode("+"), keyNode("-")].forEach((k) => FX.flash(k, "keypulse", 2800));
+        await FX.sleep(900);
+        document.querySelectorAll(".key:not(.key--sign)").forEach((k) => FX.flash(k, "keypulse", 2800));
+        break;
+      case "showNextEq":                                 // "The first water-level challenge appears."
+        if (nextQ && nextQ.eq) { renderEq(nextQ); showEqPanel(); setPlate(fmt(nextQ.start)); }
+        break;
+      case "padActive":                                  // "Dial pad stays active."
+        FX.flash(el.panel, "activate", 1300);
+        break;
+      case "displayGlow": {                              // "The final water level is marked correctly and the display lights up."
+        setPlate(el.plateText.textContent, true);
+        FX.flash(el.plate, "glowing", 2800);
+        const pp = stagePt(el.plate);
+        FX.sparkle(el.fx, pp.x, pp.y, 18, 140);
+        FX.sparkle(el.fx, LABEL_X, levelY(S.level), 12, 90);
+        break;
+      }
+      case "celebrate":                                  // "confetti/sparkles"
+        FX.sfx("confetti");
+        FX.confetti(el.confetti, { count: 160, x: 960, y: 420, power: 1.15, spread: 1.3 });
+        break;
+      case "integers":                                   // "Full integer scale, highlighted negative numbers, 0, positive numbers"
+        setView(0);
+        await FX.sleep(500);
+        await glowDirection(0, -1, 700);
+        pulseLevel(0); S.labels[0].classList.add("lit");
+        await FX.sleep(1200);
+        S.labels[0].classList.remove("lit");
+        await glowDirection(0, 1, 700);
+        break;
+      case "sweepLever": {                               // "The lever moves briefly from a negative number through 0 to a positive number."
+        if (S.level >= 0) await animateTo(-2, 200);
+        await animateTo(Math.abs(S.level), 420, true);
+        break;
+      }
+      case "badge":                                      // "completion badge"
+        FX.flash(el.medal, "show", 3200);
+        FX.sfx("board");
+        FX.sparkle(el.fx, 960, 470, 22, 200);
+        break;
+    }
+  }
+
+  /* =================================================================
+     Story (CSV Intro / Teaching / Game start): full-screen scenes with a
+     speech bubble near the speaker, or the narrator's caption.
+     ================================================================= */
+  /* The two bubble artworks, measured from the PNGs (fractions of the image):
+     `tip` = the tail's point, `text` = [left, top, width, height] of the inner area.
+     Each keeps its own proportions; "flip" mirrors the artwork only, never the text. */
+  const BUBBLES = {
+    round: { src: "assets/asset_speech_bubble_blank.png", ratio: 600 / 800, tail: "left",  tip: [0.2125, 0.892], text: [0.15, 0.217, 0.715, 0.475] },
+    wide:  { src: "assets/asset_p09_overlay_6218b7e3.png", ratio: 355 / 800, tail: "right", tip: [0.91, 0.983],  text: [0.05, 0.073, 0.90, 0.637] }
+  };
+  let shotIdx = 0;
+
+  function placeBubble(b, text) {
+    const art = BUBBLES[b.shape], flip = b.tail !== art.tail;
+    const w = b.w, h = w * art.ratio;
+    const tx = flip ? 1 - art.tip[0] : art.tip[0], ty = art.tip[1];
+    const [l, t, tw, th] = art.text;
+    Object.assign(el.bubble.style, {
+      width: w + "px", left: b.tip[0] - tx * w + "px", top: b.tip[1] - ty * h + "px",
+      transformOrigin: `${tx * 100}% ${ty * 100}%`                 // pops out of the tail
+    });
+    el.bubble.classList.toggle("flip", flip);
+    if (!el.bubbleImg.src.endsWith(art.src)) el.bubbleImg.src = art.src;
+    Object.assign(el.bubbleText.style, {
+      left: (flip ? 1 - l - tw : l) * w + "px", top: t * h + "px", width: tw * w + "px", height: th * h + "px"
+    });
+    el.bubbleText.textContent = text;
+    // largest font that keeps the line inside the bubble (the bubble itself never changes size)
+    for (let fs = 50; fs >= 20; fs -= 2) {
+      el.bubbleText.style.fontSize = fs + "px";
+      if (el.bubbleText.scrollHeight <= el.bubbleText.clientHeight + 1 && el.bubbleText.scrollWidth <= el.bubbleText.clientWidth + 1) break;
+    }
+  }
+
+  async function runScene(step) {
+    S.q = null; S.part = null; S.guided = false;
+    focusOn(null);
+    S.phase = "narrate";
+    const first = el.story.classList.contains("hidden");
+    el.story.classList.remove("hidden");
+    // cross-fade to the new scene (a repeated scene stays, only its highlights restart)
+    const cur = el.shots[shotIdx];
+    const src = `assets/story/scene-${step.scene}.jpg`;
+    let shot = cur;
+    if (!cur.classList.contains("on") || !cur.querySelector("img").src.endsWith(src)) {
+      shot = el.shots[shotIdx = 1 - shotIdx];
+      shot.querySelector("img").src = src;
+      shot.getAnimations().forEach((a) => a.cancel());
+      shot.style.transform = "";
+      shot.classList.add("on");
+      if (first) { shot.style.transition = "none"; void shot.offsetWidth; shot.style.transition = ""; }
+      cur.classList.remove("on");
+    }
+    const spots = shot.querySelector(".spots");
+    spots.innerHTML = "";
+
+    // camera: a slow move toward a point for the length of the line
+    const readMs = Math.max(3500, FX.readTime(step.vo) + 1500);
+    if (step.camera && !REDUCED) {
+      const c = step.camera;
+      shot.style.transformOrigin = `${c.x}px ${c.y}px`;
+      shot.animate([{ transform: "scale(1)" }, { transform: `scale(${c.to})` }],
+        { duration: readMs + 1200, easing: "ease-in-out", fill: "forwards" });
+    }
+
+    // who speaks: bubble near them, or the narrator's caption
+    setSpeaker(step.speaker);
+    el.caption.classList.remove("on"); el.bubble.classList.remove("on");
+    await FX.sleep(first ? 500 : 450);
+    if (step.caption) {
+      el.caption.textContent = step.ost;
+      el.caption.classList.add("on");
+    } else if (step.bubble) {
+      placeBubble(step.bubble, step.ost);
+      void el.bubble.offsetWidth;
+      el.bubble.classList.add("on");
+    }
+
+    // highlights on the scene art, one by one (+ the sign badge), while the line plays
+    const lights = (async () => {
+      await FX.sleep(400);
+      for (const [x, y] of step.glow || []) {
+        const d = document.createElement("div");
+        d.className = "spot" + (y > 600 ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
+        spots.appendChild(d);
+        void d.offsetWidth; d.classList.add("on");
+        FX.sfx("tick");
+        await FX.sleep(520);
+      }
+      if (step.sign) {
+        const g = document.createElement("div");
+        g.className = "sign " + (step.sign.text === "+" ? "plus" : "minus");
+        g.style.left = step.sign.x + "px"; g.style.top = step.sign.y + "px";
+        g.innerHTML = `<span>${step.sign.text}</span>`;
+        spots.appendChild(g);
+        void g.offsetWidth; g.classList.add("on");
+        FX.sfx("board", 0.7);
+      }
+    })();
+
+    await Promise.all([speak(step.vo), lights]);     // the line always plays to the end
+    await FX.sleep(700);
+    el.bubble.classList.remove("on");
+    el.caption.classList.remove("on");
+    await FX.sleep(250);
+    S.phase = "idle";
+  }
+
+  /** Story → game: the camera moves into the tank and the game appears. */
+  async function storyExit(next) {
+    const shot = el.shots[shotIdx];
+    if (next) { setSpeaker(next.speaker); setBanner(firstLine(next), "happy"); }   // the game's first line is already up
+    el.bubble.classList.remove("on"); el.caption.classList.remove("on");
+    if (!REDUCED) {
+      shot.getAnimations().forEach((a) => a.cancel());
+      shot.style.transformOrigin = "1045px 560px";                 // the tank in the scene art
+      shot.animate([{ transform: "scale(1)" }, { transform: "scale(2.4)" }], { duration: 1100, easing: "cubic-bezier(.6,0,.9,.6)", fill: "forwards" });
+      FX.sfx("splashIn");
+    }
+    await el.story.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: REDUCED ? 300 : 1100, fill: "forwards" }).finished;
+    el.story.classList.add("hidden");
+    el.story.getAnimations().forEach((a) => a.cancel());
+    el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
+    FX.sfx("splashOut");
+    await FX.sleep(300);
+  }
+
+  /* =================================================================
+     Transition dialogue (gate)
+     ================================================================= */
   async function runGate(step) {
-    S.q = null;
+    S.q = null; S.part = null;
     S.gate = step;
     S.guided = false;                                      // the tutorial is over: no more blur
     focusOn(null);
@@ -1064,9 +1439,9 @@
     await narrate(step.vo);
     setBanner(step.ost, "happy");
     if (step.appear === "eqPanel") {                       // "Equation panel appears beside the tank."
-      setMode("lvl");                                      // keypad grows; the equation sits on top of it
-      if (next && next.entry) setPlate(fmt(next.start));
-      await FX.sleep(650);
+      setMode("lvl");
+      if (next && next.start != null) setPlate(fmt(next.start));
+      await FX.sleep(400);
       if (next && next.eq) renderEq(next);
       showEqPanel();
       await FX.sleep(900);
@@ -1074,7 +1449,6 @@
     if (step.button) {                                     // "Learner taps Start"
       el.gateBtn.textContent = step.button;
       el.gateBtn.classList.remove("hidden");
-      focusOn("gate");
     }
     S.phase = "gate";
     resetIdle();
@@ -1083,12 +1457,10 @@
     stopIdle();
     el.gateBtn.classList.add("hidden");
     if (step.then === "activateScaleDial") {               // "Tank scale and dial become active."
-      if (next && next.entry) setPlate(fmt(next.start));
+      if (next && next.start != null) setPlate(fmt(next.start));
       [el.panel, el.plate, el.connector].forEach((n) => n.classList.remove("away"));
-      focusOn("tank");
       await FX.sleep(600);
       await glowDirection(S.view - HALF - 1, 1, 500);     // light sweeps up the whole scale
-      focusOn("pad");
       FX.flash(el.panel, "activate", 1300);
       await FX.sleep(1400);
     }
@@ -1107,32 +1479,34 @@
   }, true);
 
   /* =================================================================
-     Progress dots
-     ================================================================= */
-  /* =================================================================
      QA level jumper — lists every step; picking one reloads with ?step=ID.
      (Reload, because browsers only allow speech after a tap: press ▶ once.)
      ================================================================= */
-  const SECTION_NAMES = { tutorial: "Tutorial", level1: "Level 1", level2: "Level 2 · addition", level3: "Level 3 · subtraction" };
+  const SECTION_NAMES = { story: "Story", howto: "How to Play", level1: "Level 1", level2: "Level 2", level3: "Level 3", end: "Story end" };
+  function jumpLabel(s) {
+    if (s.type === "gate") return s.button ? "Start" : "tap";
+    if (s.type === "demo") return s.act;
+    if (s.type === "scene") return `${s.speaker || "guddu"} · ${s.scene}`;
+    if (s.type === "say") return (s.speaker || "guddu") + (s.fx ? " · " + s.fx : "");
+    const kind = s.id.endsWith("0") || s.id.endsWith("T") ? "tutorial · " : "";
+    return kind + (s.eq ? `${termA(s.eq.a)} ${s.eq.op} ${termB(s.eq.b)}` : `${fmt(s.start)} → ${fmt(s.target)}`);
+  }
   function initJumper() {
     const btn = $("btnJump"), panel = $("jumper"), list = $("jumpList");
     btn.classList.remove("hidden");
     let group = null, row = null;
     DATA.steps.forEach((s) => {
-      const key = s.type === "gate" ? s.id : s.section;
-      if (key !== group) {
-        group = key;
+      if (s.section !== group) {
+        group = s.section;
         const h = document.createElement("h3");
-        h.textContent = s.type === "gate" ? `Transition ${s.id.replace("TR", "")}` : SECTION_NAMES[key] || key;
+        h.textContent = SECTION_NAMES[group] || group;
         row = document.createElement("div");
         row.className = "jump-row";
         list.append(h, row);
       }
       const b = document.createElement("button");
       b.className = "jump-btn" + (s.id === (DATA.steps[START_INDEX] || {}).id ? " on" : "");
-      const sub = s.type === "gate" ? (s.button ? "Start" : "tap")
-        : s.eq ? `${term(s.eq.a)} ${s.eq.op} (${fmt(s.eq.b)})` : `${fmt(s.start)} → ${fmt(s.target)}`;
-      b.innerHTML = `<b>${s.id}</b><small>${sub}</small>`;
+      b.innerHTML = `<b>${s.id}</b><small>${jumpLabel(s)}</small>`;
       b.addEventListener("click", () => { location.search = "?step=" + encodeURIComponent(s.id); });
       row.appendChild(b);
     });
@@ -1148,24 +1522,30 @@
     }
   }
 
-  /** When starting mid-game, put the keypad / progress in the state that step expects. */
+  /** When starting mid-game, put the keypad / equation / lever in the state that step expects. */
   function prepareJump() {
     if (!START_INDEX) return;
     const before = DATA.steps.slice(0, START_INDEX);
-    S.guided = isGuided(DATA.steps[START_INDEX]);
-    if (before.some((s) => s.appear === "eqPanel")) setMode("lvl");
-    if (before.some((s) => s.entry)) {
+    const at = DATA.steps[START_INDEX];
+    if (before.some((s) => s.act === "enterNumber")) {
       [el.panel, el.plate, el.connector].forEach((n) => n.classList.remove("hidden"));
-      const q = DATA.steps.slice(START_INDEX).find((s) => s.type === "question");
-      if (q && q.entry) setPlate(fmt(q.start));
     }
+    if (["level2", "level3", "end"].includes(at.section)) setMode("lvl");   // Level 2 on: keypad in level mode
+    if (before.some((s) => s.fx === "leverStuck")) el.stage.classList.add("lever-off");
+    setPlate(at.plateStart || fmt(levelAt(START_INDEX)));
     before.forEach((s) => s.type === "question" && markProgress(s.id, true));
   }
 
+  /* =================================================================
+     Progress dots (one per question)
+     ================================================================= */
   function buildProgress() {
     el.progress.innerHTML = "";
+    let sec = null;
     DATA.steps.forEach((s) => {
-      if (s.type === "gate") { el.progress.appendChild(document.createElement("b")); return; }
+      if (s.type !== "question") return;
+      if (sec && s.section !== sec) el.progress.appendChild(document.createElement("b"));
+      sec = s.section;
       const i = document.createElement("i");
       i.dataset.id = s.id;
       el.progress.appendChild(i);
@@ -1184,12 +1564,15 @@
   async function run() {
     let prev = null;
     for (const step of DATA.steps.slice(START_INDEX)) {
-      if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
+      if (prev && prev.section === "story" && step.section !== "story") await storyExit(step);   // story → game
+      else if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;
       if (step.type === "question") await runQuestion(step, { flip });
       else if (step.type === "gate") await runGate(step);
-      else if (step.type === "narrate") await narrate(step.vo);
+      else if (step.type === "demo") await runDemo(step);
+      else if (step.type === "say") await runSay(step);
+      else if (step.type === "scene") await runScene(step);
     }
     // End
     focusOn(null);
@@ -1205,16 +1588,21 @@
     buildProgress();
     // Start state for the first step played (the first step, or the QA jump target)
     const first = DATA.steps[START_INDEX];
-    const firstQ = DATA.steps.slice(START_INDEX).find((s) => s.type === "question");
-    jumpTo(firstQ.start);
-    if (first === firstQ && firstQ.water === "target") setWater(firstQ.target, true);
-    setBanner(first.ost, "happy");
+    jumpTo(levelAt(START_INDEX));
+    setSpeaker(first.speaker);
+    setBanner(first.ost || (first.lever || first.entry).ost, "happy");
+    if (first.type === "scene") {                         // the story's first scene sits behind the start screen
+      el.story.classList.remove("hidden");
+      el.shots[0].querySelector("img").src = `assets/story/scene-${first.scene}.jpg`;
+      el.shots[0].classList.add("on");
+    }
     prepareJump();
     setMarkerEnabled(false);
 
     $("btnStart").addEventListener("click", () => {
       FX.unlockSpeech(); // Safari/iOS: speech and audio must be started from this tap
       FX.unlockSfx();
+      FX.startMusic();   // background music starts with the game
       setTimeout(() => FX.sfx("button"), 60);  // after the unlock (which briefly plays everything at volume 0)
       el.startScreen.classList.add("fade");
       setTimeout(() => el.startScreen.classList.add("hidden"), 500);
@@ -1237,8 +1625,10 @@
   // Preload images so nothing pops in mid-animation
   const PRELOAD = ["bg", "tank-empty", "pipe-in-dry", "pipe-in-water", "pipe-out-dry", "pipe-out-water", "track",
     "btn-up", "btn-down", "plate-blue", "panel-cream", "strip-cream", "board-green", "panel-title",
-    "banner-bar", "guddu-happy", "guddu-sad", "guddu-think", "guddu-full"];
-  Promise.all(PRELOAD.map((n) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `assets/${n}.png`; })))
+    "banner-bar", "guddu-happy", "guddu-sad", "guddu-think", "guddu-full", "pari-full", "pari-happy",
+    "asset_speech_bubble_blank", "asset_p09_overlay_6218b7e3"].map((n) => `assets/${n}.png`)
+    .concat([...new Set(DATA.steps.filter((s) => s.scene).map((s) => `assets/story/scene-${s.scene}.jpg`))]);
+  Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; })))
     .then(init);
   fitStage();
 })();

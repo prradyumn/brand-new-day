@@ -1,7 +1,8 @@
 /* =====================================================================
    Integers: Rise and Fall — game script (content only, no logic)
-   Source: "Integers_Rise and Fall - Story n Game V3-2.csv", from the
-   "How to Play" table onward (Tutorial, Level 1, Level 2, Level 3).
+   Source: "Integers_Rise and Fall - Story n Game V3 (1).csv": the story
+   (Intro, Teaching, Game start), How to Play, Level 1, Level 2 transition
+   + game, Level 3 transition + game, Story End.
    Every line of text below is copied from the CSV (speaker labels and
    quote marks removed). game.js adds no dialogue or on-screen text.
    ===================================================================== */
@@ -14,317 +15,445 @@ window.GAME_DATA = {
     visibleHalfRange: 5,      // scale shows centre ±5 (11 marks, like Figma)
     settleMs: 1300,           // marker must rest this long before it is checked
     inactivityMs: 10000,      // idle time before the inactivity VO plays
-    requireSignForPositive: true,  // CSV: learner "presses + and 4" — positive answers need the + sign
+    requireSignForPositive: true,  // CSV: learner "presses + and 2" — positive answers need the + sign (0 needs none)
     maxDigits: 2,
     speechRate: 0.95,
     speechLang: "en-IN",
     qaJumper: true            // QA level jumper (⏭ button, ?step=ID). Set false for release.
   },
 
-  /* Speaker shown in the narrator box --------------------------------- */
-  narrator: { name: "Guddu Bhaiya", avatar: "guddu" },
-
   /* Text the engine shows that comes from the CSV ---------------------- */
   ui: {
-    marked: "Water Level Marked!"          // CSV "Success" column
+    marked: "Water Level Marked!"          // CSV "Success / Confetti" column
   },
 
-  /* The flow. Each step is a "question" or a "gate" (transition).
+  /* The flow. Step types:
+       scene     story: a full-screen scene with a speech bubble (or caption) and its VO
+       demo      How to Play: the game shows the interaction itself (hand + spotlight)
+       question  learner plays. `lever` = move the marker/lever part, `entry` = keypad part.
+                 Each part: vo / ost / correct / wrong[3] (or null) / idle / success.
+       gate      transition dialogue that waits for Start or a tap
+       say       a spoken line with the animation from its "Scene Description"
+     Common fields:
+       section   story | howto | level1 | level2 | level3 | end   (a new level = dive transition)
+       speaker   guddu | pari | narrator (default guddu)
+       guided    frosted-glass spotlight + full-size character (How to Play, Level 1 tutorial)
      Question fields:
-       start / target   marker level at the start / the answer
-       demo             tutorial: the game plays it by itself (a hand moves the marker and types)
-       demoMove         how the hand moves the marker: "drag" it, or "tap" the ▲ / ▼ buttons
-       spotlight        false = no frosted-glass spotlight or full-size character for this tutorial step
-       entry            true = learner also types the level on the keypad
-       eq               { a, op, b } = the equation "a op (b) = ?" shown on top of the keypad (Level 2, Level 3)
-       liveEq           the equation updates as each step is moved (CSV Level 2 Q1)
-       water            "target" = water already at the answer, "animate" = water moves
-                        to the answer first (tutorial); absent = water follows the marker
-       vo / ost         CSV "Game Instruction / VO" and "On-Screen Text (OST)"
-       correct          CSV "Correct Feedback"
-       wrong[0..2]      CSV "Incorrect Feedback 1/2/3" + the matching animation (fx)
-       idle             CSV "Inactivity VO" + "Inactivity Animation" (fx)
-     `#ERROR!` cells in the CSV are filled from the same column of the rows
-     next to them (marked below).                                           */
+       start / target   lever level at the start / the answer
+       eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3)
+       liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3
+       autoLever        Level 3: the lever is off; it moves by itself after a correct answer
+       plateStart       what the display shows before the learner has entered anything
+       wrong: null      the CSV has no incorrect feedback for this row (tutorials):
+                        the attempt is shown (shake, ✗) but nothing is spoken
+     fx names are listed in CONTEXT.md §4; each one does only what its CSV cell says. */
   steps: [
-    /* ======================= TUTORIAL ======================= */
-    {
-      type: "question", id: "T0", section: "tutorial", demo: true, demoMove: "drag",
-      start: 2, target: 0, entry: false,
-      water: "target",
-      vo: "0 shows the water level we need. Find the 0 mark.",
-      ost: "Find the 0 mark.",
-      correct: "Correct! This is 0.",
-      wrong: [
-        { text: "Try again. Find 0 on the scale.", fx: "return" },       // Marker returns to its starting position.
-        { text: "Look for 0.",                    fx: "pulseZero" },     // The 0 mark gently pulses.
-        { text: "Move the marker to 0.",          fx: "nudge" }          // Marker gives a small nudge toward 0.
-      ],
-      idle: { text: "Find the 0 mark.", fx: "pulseZero" },               // The 0 mark glows/pulses.
-      celebrate: "small"                                                 // Small ✓ and sparkle animation.
-    },
-    {
-      type: "question", id: "T1", section: "tutorial", demo: true, demoMove: "tap",
-      start: 0, target: 2, entry: true,
-      water: "animate",
-      vo: "The water level rises by 2 levels. Move the marker up 2 levels. Where does it reach? Enter the number.",
-      ost: "Move 2 levels up. Enter the number.",
-      correct: "Correct! The water level is +2.",
-      wrong: [
-        { text: "Check the number of levels. Try again.", fx: "return" },                       // Marker returns to 0.
-        { text: "The water level went up. Move above 0.",  fx: "glowUp" },                      // Up arrow briefly glows.
-        { text: "Count 2 levels up from 0.",               fx: "countSteps", withStart: true }  // 0 and the two upward steps highlight one by one.
-      ],
-      idle: { text: "Move 2 levels up from 0.", fx: "pulseUpFirst" }                            // Up arrow and first step pulse.
-    },
-    {
-      type: "question", id: "T2", section: "tutorial", demo: true, demoMove: "tap",
-      spotlight: false,                               // nothing new since T1 apart from ▼: plays without the blur
-      start: 0, target: -3, entry: true,
-      water: "animate",
-      vo: "The water level goes down by 3 levels. Move the marker down 3 levels. Where does it reach? Enter the number.",
-      ost: "Move 3 levels down. Enter the number.",
-      correct: "Correct! The water level is −3.",
-      wrong: [
-        { text: "Check the number of levels. Try again.",   fx: "return" },                     // Marker returns to 0.
-        { text: "The water level went down. Move below 0.", fx: "glowDown" },                   // Down arrow briefly glows.
-        { text: "Count 3 levels down from 0.",              fx: "countSteps", withStart: true } // 0 and the three downward steps highlight one by one.
-      ],
-      idle: { text: "Move 3 levels down from 0.", fx: "pulseDownFirst" }                        // Down arrow and first step pulse.
-    },
+    /* ======================= STORY (CSV Intro / Teaching / Game start) =======================
+       Full-screen scenes (assets/story/scene-pXX.jpg, from assets/scene_pXX_background_clean.png).
+       bubble: { shape: "round" | "wide", tail: "left" | "right", w, tip: [x, y] }
+               the bubble keeps its own proportions (never stretched); `tip` is where the
+               tail points (the speaker), in stage px. caption: the narrator's line as on-screen text.
+       camera: a slow move { to: zoom, x, y } (the point the camera moves toward)
+       glow:   level marks on the scene art that light up one by one, [x, y] in scene px
+       sign:   a "+" / "−" badge (CSV visual assets "plus sign" / "minus sign")          */
+    { type: "scene", id: "ST1", section: "story", speaker: "narrator", scene: "p01", caption: true,
+      camera: { to: 1.14, x: 580, y: 520 },                                // Wide view of the village. Camera moves towards the large water tank.
+      vo: "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working.",
+      ost: "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working." },
+    { type: "scene", id: "ST2", section: "story", scene: "p02",
+      camera: { to: 1.05, x: 1045, y: 560 },                               // Camera moves closer to the tank. Guddu Bhaiya and Pari stand beside it.
+      bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
+      vo: "Pari, can you help me mark the water levels?",
+      ost: "Pari, can you help me mark the water levels?" },
+    { type: "scene", id: "ST3", section: "story", speaker: "pari", scene: "p03",   // Pari looks at Guddu Bhaiya and agrees to help.
+      bubble: { shape: "round", tail: "left", w: 520, tip: [1440, 468] },
+      vo: "Yes! Let’s fix it.",
+      ost: "Yes! Let’s fix it." },
+    { type: "scene", id: "ST4", section: "story", scene: "p06",
+      glow: [[757, 575]],                                                  // Close-up of the water-level scale. The 0 level glows first.
+      bubble: { shape: "wide", tail: "left", w: 560, tip: [600, 255] },
+      vo: "Look Pari, 0 shows the water level we need.",
+      ost: "Look Pari, 0 shows the water level we need." },
+    { type: "scene", id: "ST5", section: "story", scene: "p07",
+      camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 are highlighted one by one. Camera moves upward.
+      glow: [[922, 481], [922, 396], [922, 308]],
+      bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
+      vo: "Above 0, there is more water than requirement.",
+      ost: "Above 0, there is more water than requirement." },
+    { type: "scene", id: "ST6", section: "story", scene: "p08",
+      camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 are highlighted one by one. Camera moves downward.
+      glow: [[922, 650], [922, 743], [922, 842]],
+      bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
+      vo: "Below 0, there is less water than requirement.",
+      ost: "Below 0, there is less water than requirement." },
+    { type: "scene", id: "ST7", section: "story", scene: "p07",
+      camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 highlighted one by one, plus sign.
+      glow: [[922, 481], [922, 396], [922, 308]], sign: { text: "+", x: 1100, y: 395 },
+      bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
+      vo: "Now notice this, numbers above 0 are positive numbers.",
+      ost: "Now notice this, numbers above 0 are positive numbers." },
+    { type: "scene", id: "ST8", section: "story", scene: "p09",
+      camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 highlighted one by one, minus sign.
+      glow: [[922, 650], [922, 743], [922, 842]], sign: { text: "−", x: 1100, y: 745 },
+      bubble: { shape: "wide", tail: "right", w: 500, tip: [530, 395] },
+      vo: "And, numbers below 0 are negative numbers.",
+      ost: "And, numbers below 0 are negative numbers." },
+    { type: "scene", id: "ST9", section: "story", speaker: "pari", scene: "p10",   // Full scale: negative numbers, 0, positive numbers. Pari responds.
+      glow: [[922, 650], [922, 743], [922, 842], [930, 553], [922, 481], [922, 396], [922, 308]],
+      bubble: { shape: "round", tail: "left", w: 560, tip: [1440, 470] },
+      vo: "Oh! so, below 0 is negative, and above 0 is positive!",
+      ost: "Oh! so, below 0 is negative, and above 0 is positive!" },
+    { type: "scene", id: "ST10", section: "story", scene: "p04",
+      glow: [[930, 553]],                                                  // Camera returns to the full tank and lever. The 0 mark glows.
+      bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
+      vo: "Correct, Let’s mark the correct water level.",
+      ost: "Correct, Let’s mark the correct water level." },
 
-    /* ============== TRANSITION → LEVEL 1 ============== */
+    /* ======================= HOW TO PLAY (guided demo) ======================= */
     {
-      type: "gate", id: "TR1",
-      vo: "Good! Now you know how the levels work. Let’s mark the new water levels.",
-      ost: "Let’s mark the new water level.",
-      button: "Start",                                                   // Learner taps Start / continues.
-      then: "activateScaleDial",                                         // Tank scale and dial become active.
-      idle: { text: "Let’s mark the new water level.", fx: "pulseGate" } // Start button or tank scale gently pulses.
+      type: "demo", id: "H1", section: "howto", guided: true, speaker: "narrator",
+      act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0
+      vo: "Move the lever up or down as shown.",
+      ost: "Move the lever up or down."
+    },
+    {
+      type: "demo", id: "H2", section: "howto", guided: true,
+      act: "leverMark", to: 4,                          // "The lever moves along the scale and stops at the new level."
+      vo: "Mark the correct water level.",
+      ost: "Mark the correct water level."
+    },
+    {
+      type: "demo", id: "H3", section: "howto", guided: true,
+      act: "enterNumber", key: "4",                     // "Camera shifts to the dial and display screen."
+      vo: "Now enter the new water level.",
+      ost: "Now, enter the new water level."
+    },
+    {
+      type: "demo", id: "H4", section: "howto", guided: true,
+      act: "chooseSign", key: "+",                      // "Plus and minus sign buttons are highlighted beside the number buttons."
+      vo: "Choose the correct sign for the water level.",
+      ost: "Choose the correct sign."
+    },
+    {
+      type: "demo", id: "H5", section: "howto", guided: true,
+      act: "check", ostFirst: true,                     // "Check icon glows … Both glow and a tick appears."
+      vo: "Great! You marked the water level correctly.",
+      ost: "Check the water level marked."
     },
 
     /* ======================= LEVEL 1 ======================= */
     {
-      type: "question", id: "Q1", section: "level1",
-      start: 2, target: 4, entry: true,
-      vo: "The water level is at +2. It rises 2 levels. What is the new water level?",
-      ost: "2 levels up from +2 = ?",
-      correct: "Correct! The new water level is +4.",
-      wrong: [
-        { text: "Try again. Start at +2 and move 2 levels up.",            fx: "return" },      // Marker returns to +2.
-        { text: "The water level is rising. Which way should you move?",   fx: "glowDirUp" },   // Upward direction on the scale glows.
-        { text: "Count 2 levels up from +2.",                              fx: "countSteps" }   // #ERROR! → steps one by one (as Q5/Q6)
-      ],
-      idle: { text: "Move 2 levels up from +2.", fx: "pulseMarkerNext" }                        // Marker and next level above it pulse.
+      type: "question", id: "L1T", section: "level1", guided: true,
+      start: 2, target: 0, plateStart: "?",             // "The marker starts above 0."
+      lever: {
+        vo: "0 shows the sufficient water level. Find the 0 mark.",
+        ost: "0 shows the sufficient water level. Find the 0 mark.",
+        correct: "Correct! This is 0.",                                  // Marker locks at 0. The 0 mark glows briefly.
+        wrong: [
+          { text: "Try again. Find 0 on the scale.", fx: "return" },     // Marker returns to its starting position.
+          { text: "Look for 0.",                    fx: "pulseZero" },   // The 0 mark gently pulses.
+          { text: "Move the marker to 0.",          fx: "nudge" }        // Marker gives a small nudge towards 0.
+        ],
+        idle: { text: "Find the 0 mark.", fx: "pulseZero" },             // The 0 mark glows/pulses.
+        success: "small"                                                 // Small ✓ and sparkle animation.
+      },
+      entry: {                                                           // Dialer is highlighted on the screen.
+        vo: "Now enter the current water level on the screen.",
+        ost: "Enter the current water level.",
+        correct: "Correct! This is the current water level.",            // 0 appears on the display and glows briefly.
+        wrong: [
+          { text: "Try again. What level is the marker on?", fx: "pulseTarget" },  // 0 on the scale pulses.
+          { text: "Look at the marked water level.",         fx: "glowMarker" },   // Marker at 0 glows.
+          { text: "Enter 0 on the screen.",                  fx: "pulseKeys" }     // 0 button on the dial pulses.
+        ],
+        idle: { text: "Enter the current water level.", fx: "pulsePadKeys" },      // Dial and 0 button gently pulse.
+        success: "small"                                                 // Small ✓ and sparkle.
+      }
     },
     {
-      type: "question", id: "Q2", section: "level1",
-      start: 4, target: 6, entry: true,
-      vo: "The water level is at +4. It rises 2 more levels. What is the new water level?",
-      ost: "2 levels up from +4 = ?",
-      correct: "Correct! The new water level is +6.",
-      wrong: [
-        { text: "Try again. Start at +4 and move 2 levels up.", fx: "return" },                 // Marker returns to +4.
-        { text: "The level is rising. Move up.",                fx: "glowDirUp" },              // Up direction glows.
-        { text: "Count 2 levels up from +4.",                   fx: "countSteps" }              // #ERROR! → steps one by one
-      ],
-      idle: { text: "Move 2 levels up from +4.", fx: "pulseMarkerNext" }                        // #ERROR! → as Q1
+      type: "gate", id: "TR1", section: "level1",
+      vo: "Great! Now you know how the levels work. \nLet’s mark the water levels.",
+      ost: "Let’s mark the water levels.",
+      button: "Start",                                                   // Learner taps Start / continues.
+      then: "activateScaleDial",                                         // Tank scale and dial become active.
+      idle: { text: "Let’s mark the new water level.", fx: "pulseGate" } // Start button or tank scale gently pulses.
     },
-    {
-      type: "question", id: "Q3", section: "level1",
-      start: 6, target: 3, entry: true,
-      vo: "The water level is at +6. The villagers use 3 levels of water. What is the new water level?",
-      ost: "3 levels down from +6 = ?",
-      correct: "Correct! The new water level is +3.",
-      wrong: [
-        { text: "Try again. Start at +6 and move 3 levels down.", fx: "return" },               // Marker returns to +6.
-        { text: "Water was used, so the level goes down.",        fx: "glowDirDown" },          // Down direction glows.
-        { text: "Count 3 levels down from +6.",                   fx: "countSteps" }            // #ERROR! → steps one by one
-      ],
-      idle: { text: "Move 3 levels down from +6.", fx: "pulseNext" }                            // First downward step pulses.
-    },
-    {
-      type: "question", id: "Q4", section: "level1",
-      start: 3, target: -1, entry: true, crossZero: true,
-      vo: "The water level is at +3. The villagers use 4 more levels of water. What is the new water level?",
-      ost: "4 levels down from +3 = ?",
-      correct: "Correct! The new water level is −1.",
-      wrong: [
-        { text: "Try again. Start at +3 and move 4 levels down.", fx: "return" },               // Marker returns to +3.
-        { text: "Keep moving down. You can cross 0.",             fx: "pulseZero" },            // 0 briefly glows to show the crossing point.
-        { text: "Count 4 levels down from +3.",                   fx: "countSteps" }            // #ERROR! → steps one by one
-      ],
-      idle: { text: "Move 4 levels down from +3.", fx: "pulseNext" }                            // The first downward step pulses.
-    },
-    {
-      type: "question", id: "Q5", section: "level1",
-      start: -1, target: -3, entry: true,
-      vo: "The water level is at −1. The villagers use 2 more levels of water. What is the new water level?",
-      ost: "2 levels down from −1 = ?",
-      correct: "Correct! The new water level is −3.",
-      wrong: [
-        { text: "Try again. Start at −1 and move 2 levels down.", fx: "return" },               // Lever returns to −1.
-        { text: "The water level goes down. Move lower.",         fx: "glowDirDown" },          // Down direction glows.
-        { text: "Count 2 levels down from −1.",                   fx: "countSteps" }            // −2, −3 highlight one by one.
-      ],
-      idle: { text: "Move 2 levels down from −1.", fx: "pulseNext" }                            // −2 gently pulses.
-    },
-    {
-      type: "question", id: "Q6", section: "level1",
-      start: -3, target: -7, entry: true,
-      vo: "The water level is at −3. The villagers use 4 more levels of water. What is the new water level?",
-      ost: "4 levels down from −3 = ?",
-      correct: "Correct! The new water level is −7.",
-      wrong: [
-        { text: "Try again. Start at −3 and move 4 levels down.", fx: "return" },               // Lever returns to −3.
-        { text: "The water level goes down. Move lower.",         fx: "glowDirDown" },          // Down direction glows.
-        { text: "Count 4 levels down from −3.",                   fx: "countSteps" }            // −4, −5, −6, −7 highlight one by one.
-      ],
-      idle: { text: "Move 4 levels down from −3.", fx: "pulseNext" }                            // −4 gently pulses.
-    },
+    q1("Q1", 0, 2,
+      "The water level rises 2 levels. Move the marker up 2 levels.",
+      "The water rises 2 levels. Move the marker 2 levels up.",
+      { text: "The water level went up. Move above 0.", fx: "glowUp" },  // Up arrow briefly glows.
+      "Count 2 levels up from 0.", "Move 2 levels up from 0."),          // +1 and +2 highlight one by one. / Up arrow and +1 pulse.
+    q1("Q2", 2, 4,
+      "The water level rises 2 levels up. Move the marker up 2 levels.",
+      "The water level rises 2 levels up. \nMove the marker up 2 levels.",
+      { text: "The water level is rising. Move up.", fx: "glowDirUp" },  // Upward direction glows.
+      "Count 2 levels up from +2.", "Move 2 levels up from +2."),        // +3 and +4 … / +3 and up arrow pulse.
+    q1("Q3", 4, 6,
+      "The water level rises 2 levels more. Move the marker 2 levels up.",
+      "The water level rises 2 levels more. \nMove the marker 2 levels up.",
+      { text: "The water level is rising. Move up.", fx: "glowDirUp" },
+      "Count 2 levels up from +4.", "Move 2 levels up from +4."),
+    q1("Q4", 6, 3,
+      "The water level goes down 3 levels. Move the marker 3 levels down.",
+      "The water level goes down 3 levels. Move the marker 3 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },  // Downward direction glows.
+      "Count 3 levels down from +6.", "Move 3 levels down from +6."),    // +5, +4 and +3 … / +5 and down arrow pulse.
+    q1("Q5", 3, -1,
+      "The water level goes down 4 levels. Move the marker 4 levels down.",
+      "The water goes down 4 levels. Move the marker 4 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 4 levels down from +3.", "Move 4 levels down from +3."),    // +2, +1, 0, −1 … / Down arrow and +2 pulse.
+    q1("Q6", -1, -3,
+      "The water level goes down 2 levels. Move the marker 2 levels down.",
+      "The water goes down 2 levels. Move the marker 2 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 2 levels down from −1.", "Move 2 levels down from −1."),
+    q1("Q7", -3, -7,
+      "The water level goes down 4 levels. Move the marker 4 levels down.",
+      "The water goes down 4 levels. Move the marker 4 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 4 levels down from −3.", "Move 4 levels down from −3."),
 
-    /* ============== TRANSITION → LEVEL 2 ============== */
+    /* ============== LEVEL 2 TRANSITION (teaching) ============== */
+    { type: "say", id: "P1", section: "level2", speaker: "pari", level: 2,
+      vo: "I noticed something! When the water level rises, we add to the current level.",
+      ost: "Water level rises → Add" },                                  // Full water-level scale is visible. (OST in the narrator box)
+    { type: "say", id: "P2", section: "level2", speaker: "pari", level: 2,
+      fx: "moveTo", to: 1,                                               // The lever moves slightly downward.
+      vo: "And when the water level goes down, we subtract from the current level.",
+      ost: "Water level goes down → Subtract" },
+    { type: "say", id: "P3", section: "level2", level: 1, ostIn: "eq",
+      fx: "countSteps", from: 1, to: 3,                                  // Lever starts at +1. Two levels above it highlight one by one.
+      vo: "Correct, Pari! If the water level is at +1 and rises by 2 levels, ",
+      ost: "1 + 2 = ?" },
+    { type: "say", id: "P4", section: "level2", level: 1, ostIn: "eq", ostAfter: true,
+      fx: "moveTo", to: 3,                                               // Lever moves +1 → +2 → +3. The equation completes.
+      vo: "We add and the new water level is +3.",
+      ost: "1 + 2 = 3" },
+    { type: "say", id: "P5", section: "level2", level: 3, ostIn: "eq",
+      fx: "countSteps", from: 3, to: -2,                                 // Lever starts at +3. Five levels below it highlight one by one.
+      vo: "Now, if the water level is at +3 and goes down by 5 levels.",
+      ost: "3 − 5 = ?" },
+    { type: "say", id: "P6", section: "level2", level: 3, ostIn: "eq", ostAfter: true,
+      fx: "moveTo", to: -2, zeroGlow: true,                              // +3 → … → −2, 0 highlighted while crossing.
+      vo: "We subtract and the new water level is −2.",
+      ost: "3 − 5 = −2" },
+    { type: "say", id: "P7", section: "level2", speaker: "pari", level: -2,
+      fx: "riseFall",                                                    // Up arrow, down arrow, plus and minus symbols.
+      vo: "Got it! When the level rises, we add. When it goes down, we subtract.",
+      ost: "Rise → Add • Go down → Subtract" },
     {
-      type: "gate", id: "TR2",
-      vo: "Now let’s calculate the water levels exactly.",
-      ost: "Let’s calculate the water levels!",
+      type: "gate", id: "TR2", section: "level2",
+      vo: "Let’s calculate the water levels exactly.",
+      ost: "Let’s calculate the water levels exactly!",
       appear: "eqPanel",                                                 // Equation panel appears beside the tank.
       continueOnTap: true,                                               // Learner observes and taps to continue.
       idle: { text: "Let’s find the new water level.", fx: "pulseEqPanel" } // Equation panel gently pulses.
     },
 
-    /* ======================= LEVEL 2 (addition) ======================= */
+    /* ======================= LEVEL 2 GAME ======================= */
     {
-      type: "question", id: "A1", section: "level2",
-      start: 0, target: 3, entry: true, eq: { a: 0, op: "+", b: 3 }, liveEq: true,
-      vo: "The water level is at 0. It increases by 3 levels. Let’s find the new water level.",
-      ost: "The water level is at 0.\n0 + (+3) = ?",
-      correct: "Correct! The new water level is +3.",
-      wrong: [
-        { text: "The water level is increasing. Move upward.", fx: "glowDirUp" },                          // Upward side of the scale highlights.
-        { text: "Start at 0 and count 3 levels up.",           fx: "countSteps", withStart: true },        // 0 → +1 → +2 → +3 highlights one level at a time.
-        { text: "Count the 3 levels carefully.",               fx: "pulseSteps" }                          // Three levels above 0 gently pulse.
-      ],
-      idle: { text: "Start at 0 and count 3 levels up.", fx: "pulseEqTerms" }                              // 0 and (+3) in the equation gently pulse.
+      type: "question", id: "A0", section: "level2",
+      start: 0, target: 3, eq: { a: 0, op: "+", b: 3 }, liveEq: true,   // Tutorial: 0 + 3 = ?
+      lever: {
+        vo: "The water level goes up 3 levels. Move the lever 3 levels up.",
+        ost: "Move the lever 3 levels up.",
+        correct: "Correct! You reached +3.",                             // Lever locks at +3.
+        wrong: null,                                                     // (no incorrect feedback in the CSV)
+        idle: { text: "Move the lever 3 levels up from 0.", fx: "pulseMarkerNext" },  // Lever and +1 gently pulse.
+        success: "small"
+      },
+      entry: {
+        vo: "Tap the new water level.",
+        ost: "Tap the new water level.",
+        correct: "Correct! The new water level is +3.",                  // Equation completes: 0 + 3 = +3.
+        wrong: null,
+        idle: { text: "Tap the new water level.", fx: "pulseTargetPad" }, // +3 on the scale and dial pad gently pulse.
+        success: "marked"
+      }
     },
-    {
-      type: "question", id: "A2", section: "level2",
-      start: 2, target: 5, entry: true, eq: { a: 2, op: "+", b: 3 },
-      vo: "The water level is at +2. It increases by 3 levels. Find the new water level.",
-      ost: "(+2) + (+3) = ?",
-      correct: "Correct! The new water level is +5.",
-      wrong: [
-        { text: "Check how the water level needs to change.", fx: "pulseStart" },                          // Starting level +2 pulses.
-        { text: "Start again from +2.",                       fx: "return" },                              // Lever resets to +2.
-        { text: "Count 3 levels from +2.",                    fx: "countSteps", pulse: true }              // #ERROR! → levels pulse one by one (as A3/A5)
-      ],
-      idle: { text: "Start at +2 and find the new water level.", fx: "pulseEqTerms" }                      // #ERROR! → start and operand pulse (as A3/A5)
-    },
-    {
-      type: "question", id: "A3", section: "level2",
-      start: -2, target: 2, entry: true, eq: { a: -2, op: "+", b: 4 },
-      vo: "The water level increases by 4 levels. Find the new water level.",
-      ost: "(−2) + (+4) = ?",
-      correct: "Correct! The new water level is +2.",
-      wrong: [
-        { text: "Check how the water level should change.", fx: "pulseStart" },                            // Starting level −2 pulses.
-        { text: "Start again from −2.",                     fx: "return" },                                // Lever resets to −2.
-        { text: "Count 4 levels as you move.",              fx: "countSteps", pulse: true }                // −1, 0, +1, +2 pulse one by one.
-      ],
-      idle: { text: "Start at −2 and find the new water level.", fx: "pulseEqTerms" }                      // −2 and (+4) in the equation pulse.
-    },
-    {
-      type: "question", id: "A4", section: "level2",
-      start: 3, target: -2, entry: true, eq: { a: 3, op: "+", b: -5 },
-      vo: "Your turn! Find the new water level.",
-      ost: "(+3) + (−5) = ?",
-      correct: "Correct! The new water level is −2.",
-      wrong: [
-        { text: "Check whether the level should rise or come down.", fx: "pulseStartEq" },                 // Starting level +3 and equation pulse.
-        { text: "Start again from +3.",                              fx: "return" },                       // Lever resets to +3.
-        { text: "Count 5 levels carefully.",                         fx: "countSteps", pulse: true }       // #ERROR! → levels pulse one by one
-      ],
-      idle: { text: "Start at +3 and find the new water level.", fx: "pulseEqTerms" }                      // #ERROR! → start and operand pulse
-    },
-    {
-      type: "question", id: "A5", section: "level2",
-      start: -2, target: -5, entry: true, eq: { a: -2, op: "+", b: -3 },
-      vo: "Find the new water level.",
-      ost: "(−2) + (−3) = ?",
-      correct: "Correct! The new water level is −5.",
-      wrong: [
-        { text: "Check how the water level should change.", fx: "pulseStart" },                            // Starting level −2 pulses.
-        { text: "Start again from −2.",                     fx: "return" },                                // Lever resets to −2.
-        { text: "Count 3 levels as you move.",              fx: "countSteps", pulse: true }                // −3, −4, −5 pulse one by one.
-      ],
-      idle: { text: "Start at −2 and find the new water level.", fx: "pulseEqTerms" }                      // −2 and (−3) in the equation pulse.
-    },
+    q2("A1", 2, 5, { a: 2, op: "+", b: 3 },
+      "The water level rises 3 levels up. Move the lever to correct water level.",
+      "The water level rises 3 levels up. \nMove the lever to correct water level.",
+      { text: "The water level goes up. Move upward.", fx: "glowDirUp" },
+      "Count 3 levels up from +2.", "Move the lever 3 levels up from +2."),
+    q2("A2", -2, 2, { a: -2, op: "+", b: 4 },
+      "The water level rises 4 levels up. Move the lever to the correct water level.",   // CSV typo "thje" → "the"
+      "The water level rises 4 levels up. \nMove the lever to the correct water level.",
+      { text: "The water level goes up. Move upward.", fx: "glowDirUp" },
+      "Count 4 levels up from −2.", "Move the lever 4 levels up from −2."),
+    q2("A3", 3, -2, { a: 3, op: "−", b: 5 },
+      "The water level goes down 5 levels. Move the lever to the correct water level.",
+      "The water level goes down 5 levels. \nMove the lever 5 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 5 levels down from +3.", "Move the lever 5 levels down from +3."),
+    q2("A4", -2, -5, { a: -2, op: "+", b: -3 },
+      "The water level goes down 3 levels. Move the lever 3 levels down.",
+      "Move the lever 3 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 3 levels down from −2.", "Move the lever 3 levels down from −2."),
+    q2("A5", -5, -3, { a: -5, op: "+", b: 2 },
+      "The water level goes up 2 levels. Move the lever 2 levels up.",
+      "Move the lever 2 levels up.",
+      { text: "The water level goes up. Move upward.", fx: "glowDirUp" },
+      "Count 2 levels up from −5.", "Move the lever 2 levels up from −5."),
+    q2("A6", -3, -7, { a: -3, op: "−", b: 4 },
+      "The water level goes down 4 levels. Move the lever 4 levels down.",
+      "Move the lever 4 levels down.",
+      { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
+      "Count 4 levels down from −3.", "Move the lever 4 levels down from −3."),
+    { type: "say", id: "E2", section: "level2", ostIn: "board", fx: "levelComplete",   // final level glows, ✓, confetti
+      vo: "Great job! You marked the water levels correctly.",
+      ost: "Level Complete!" },
 
-    /* ======================= LEVEL 3 (subtraction) ======================= */
+    /* ============== LEVEL 3 TRANSITION ============== */
+    { type: "say", id: "S0", section: "level3",
+      vo: "Let’s mark some more water levels.",
+      ost: "Let’s mark some more water levels!" },
+    { type: "say", id: "R2", section: "level3", speaker: "pari", fx: "leverStuck",     // Pari tries the lever; it does not respond.
+      vo: "Oh! The lever isn’t working now!",
+      ost: "Oh! The lever isn’t working now!" },
+    { type: "say", id: "R3", section: "level3", fx: "padGlow",                          // The dial pad begins to glow.
+      vo: "That’s okay! Pari. \nLet’s mark the new water level using the number pad.",
+      ost: "That’s okay! Pari. \nLet’s mark the new water level using the number pad." },
+    { type: "say", id: "R4", section: "level3", fx: "keysPulse",                        // The sign and number buttons gently pulse.
+      vo: "Choose the correct sign and number.",
+      ost: "Choose the correct sign and number." },
+    { type: "say", id: "R5", section: "level3", fx: "showNextEq",                       // The first water-level challenge appears.
+      vo: "And Let’s see where the water level reaches!",
+      ost: "And Let’s see where the water level reaches!" },
+    { type: "say", id: "R6", section: "level3", speaker: "pari", fx: "padActive",       // Dial pad stays active.
+      vo: "I’m ready! Let’s mark the new level.",
+      ost: "I’m ready! Let’s mark the new level." },
+
+    /* ======================= LEVEL 3 GAME (keypad only) ======================= */
     {
-      type: "question", id: "S1", section: "level3",
-      start: 0, target: -3, entry: true, eq: { a: 0, op: "−", b: 3 },
-      vo: "The water level is at 0. Now 3 levels are used. Let’s find the new water level.",
-      ost: "0 − (+3) = ?",
-      correct: "Correct! The new water level is −3.",
-      wrong: [
-        { text: "The water level needs to go down.",  fx: "glowDirDown" },                                 // Downward side of the scale highlights.
-        { text: "Start at 0 and move 3 levels down.", fx: "highlightStart" },                              // 0 highlights as the starting level.
-        { text: "Count 3 levels down carefully.",     fx: "countSteps", pulse: true }                      // −1, −2, −3 pulse one by one.
-      ],
-      idle: { text: "Start at 0 and count 3 levels down.", fx: "pulseEqTerms" }                            // 0 and (+3) in the equation gently pulse.
+      type: "question", id: "B0", section: "level3",
+      start: 0, target: 4, eq: { a: 0, op: "+", b: 4 }, autoLever: true,           // Tutorial
+      entry: {
+        vo: "The water level is at 0. It goes up 4 levels. Enter the new water level.",
+        ost: "0 + 4 = ?\nEnter the new water level.",
+        correct: "Correct! The new water level is +4.",                  // Lever automatically moves 0 → +4.
+        wrong: null,
+        idle: { text: "Enter the new water level.", fx: "pulseKeys" },   // + and 4 buttons on the dial pad gently pulse.
+        success: "marked"
+      }
     },
-    {
-      type: "question", id: "S2", section: "level3",
-      start: 4, target: 2, entry: true, eq: { a: 4, op: "−", b: 2 },
-      vo: "Now it’s your turn! Find the new water level.",
-      ost: "(+4) − (+2) = ?",
-      correct: "Correct! The new water level is +2.",
-      wrong: [
-        { text: "Check how the water level needs to change.", fx: "pulseStart" },                          // Starting level +4 pulses.
-        { text: "Start again from +4.",                       fx: "return" },                              // Lever resets to +4.
-        { text: "Count 2 levels down from +4.",               fx: "countSteps", pulse: true }              // #ERROR! → levels pulse one by one (as S4)
-      ],
-      idle: { text: "Start at +4 and find the new water level.", fx: "pulseEqTerms" }                      // #ERROR! → start and operand pulse (as S4)
-    },
-    {
-      type: "question", id: "S3", section: "level3",
-      start: 2, target: -2, entry: true, eq: { a: 2, op: "−", b: 4 },
-      vo: "Find the new water level.",
-      ost: "(+2) − (+4) = ?",
-      correct: "Correct! The new water level is −2.",
-      wrong: [
-        { text: "Check how the water level should change.", fx: "pulseStart" },                            // Starting level +2 pulses.
-        { text: "Start again from +2.",                     fx: "return" },                                // Lever resets to +2.
-        { text: "Count 4 levels down from +2.",             fx: "countSteps", pulse: true }                // #ERROR! → levels pulse one by one
-      ],
-      idle: { text: "Start at +2 and find the new water level.", fx: "pulseEqTerms" }                      // #ERROR! → start and operand pulse
-    },
-    {
-      type: "question", id: "S4", section: "level3",
-      start: -1, target: -4, entry: true, eq: { a: -1, op: "−", b: 3 },
-      vo: "Your turn! Find the new water level.",
-      ost: "(−1) − (+3) = ?",
-      correct: "Correct! The new water level is −4.",
-      wrong: [
-        { text: "Check how the water level should change.", fx: "pulseStart" },                            // Starting level −1 pulses.
-        { text: "Start again from −1.",                     fx: "return" },                                // Lever resets to −1.
-        { text: "Count 3 levels down from −1.",             fx: "countSteps", pulse: true }                // −2, −3, −4 pulse one by one.
-      ],
-      idle: { text: "Start at −1 and find the new water level.", fx: "pulseEqTerms" }                      // −1 and (+3) in the equation pulse.
-    },
-    {
-      type: "question", id: "S5", section: "level3",
-      start: -3, target: -1, entry: true, eq: { a: -3, op: "−", b: -2 },
-      vo: "Find the new water level.",
-      ost: "(−3) − (−2) = ?",
-      correct: "Correct! The new water level is −1.",
-      wrong: [
-        { text: "Look carefully at the two minus signs.",         fx: "glowEqOp" },                        // − (−2) in the equation glows.
-        { text: "Subtracting a negative changes the direction.",  fx: "glowDirUp" },                       // Upward direction on the scale highlights.
-        { text: "Start at −3 and move 2 levels up.",              fx: "countSteps", pulse: true }          // −2, −1 pulse one by one.
-      ],
-      idle: { text: "Look at −(−2). Which way should the level move?", fx: "pulseEqOpDirUp" }              // −(−2) and the upward side of the scale gently pulse.
-    }
+    q3("B1", 4, 7, { a: 4, op: "+", b: 3 }, "goes up 3 levels", "Try again. The water level goes up.",
+      "Count 3 levels up from +4.", "Check the new water level and its sign."),
+    q3("B2", 7, 1, { a: 7, op: "−", b: 6 }, "goes down 6 levels", "Try again. The water level goes down.",
+      "Count 6 levels down from +7.", "Check the new water level and its sign."),
+    q3("B3", 1, -4, { a: 1, op: "−", b: 5 }, "goes down 5 levels", "Try again. The water level goes down.",
+      "Count 5 levels down from +1.", "The new level is below 0. Check the sign."),
+    q3("B4", -4, -6, { a: -4, op: "−", b: 2 }, "goes down 2 levels", "Try again. The water level goes down.",
+      "Count 2 levels down from −4.", "Check the new water level and its sign."),
+    q3("B5", -6, -3, { a: -6, op: "+", b: 3 }, "goes up 3 levels", "Try again. The water level goes up.",
+      "Count 3 levels up from −6.", "Check the new water level and its sign."),
+    q3("B6", -3, -1, { a: -3, op: "+", b: 2 }, "goes up 2 levels", "Try again. The water level goes up.",
+      "Count 2 levels up from −3.", "Check the new water level and its sign."),
+
+    /* ======================= STORY END ======================= */
+    { type: "say", id: "Z1", section: "end", fx: "displayGlow",                         // display lights up, sparkle
+      vo: "Great work! You marked all the water levels correctly.",
+      ost: "Great work! You marked all the water levels correctly." },
+    { type: "say", id: "Z2", section: "end", speaker: "pari", fx: "celebrate",          // confetti/sparkles
+      vo: "We did it! We tracked every rise and fall in the water level.",
+      ost: "We did it! We tracked every rise and fall in the water level." },
+    { type: "say", id: "Z3", section: "end", fx: "integers",                            // negatives, 0, positives highlighted
+      vo: "And these positive numbers, negative numbers, and 0 are called integers.",
+      ost: "And these positive numbers, negative numbers, and 0 are called integers." },
+    { type: "say", id: "Z4", section: "end", speaker: "pari", fx: "sweepLever",         // lever: negative → 0 → positive
+      vo: "So integers helped us show water levels at 0, above 0, and below 0!",
+      ost: "So integers helped us show water levels below 0, at 0, and above 0!" },
+    { type: "say", id: "Z5", section: "end", fx: "badge",                               // completion badge
+      vo: "Excellent! You’re a Water Level Expert now!",
+      ost: "Excellent! You’re a Water Level Expert now!" }
   ]
 };
+
+/* ---- Row builders: the CSV repeats the same feedback pattern in every example row,
+        only the numbers change. Text still comes from the CSV, word for word. ---- */
+function signed(n) { return n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "0"; }
+
+/** Level 1 example: marker part + keypad part. */
+function q1(id, start, target, vo, ost, wrong2, count, idle) {
+  const t = signed(target);
+  return {
+    type: "question", id, section: "level1", start, target,
+    lever: {
+      vo, ost,
+      correct: `Correct! You reached ${t}.`,                                   // Marker locks at …
+      wrong: [
+        { text: "Check the number of levels. Try again.", fx: "return" },      // Marker returns to the start.
+        wrong2,                                                                // arrow / direction glows
+        { text: count, fx: "countSteps" }                                      // the levels highlight one by one
+      ],
+      idle: { text: idle, fx: "pulseArrowNext" },                                // arrow and the next level pulse
+      success: "small"                                                         // Small ✓ and sparkle.
+    },
+    entry: {
+      vo: "Enter the new water level.",
+      ost: "Enter the new water level.",
+      correct: `Correct! The water level is ${t}.`,                            // … appears on the display.
+      wrong: [
+        { text: "Try again. Check where the marker is.",  fx: "pulseMarker" }, // Marker at … pulses.
+        { text: "Look at the number beside the marker.",  fx: "glowTarget" },  // … on the scale glows.
+        { text: `Enter ${t} on the screen.`,              fx: "pulseKeys" }    // sign and number buttons pulse.
+      ],
+      idle: { text: "Enter the new water level.", fx: "pulsePad" },            // Dial pad gently pulses.
+      success: "marked"                                                        // ✓ Sparkle + Water Level Marked!
+    }
+  };
+}
+
+/** Level 2 example: lever part + keypad part, with the equation panel. */
+function q2(id, start, target, eq, vo, ost, wrong2, count, idle) {
+  const t = signed(target);
+  return {
+    type: "question", id, section: "level2", start, target, eq,
+    lever: {
+      vo, ost,
+      correct: `Correct! You reached ${t}.`,                                   // Lever locks at …
+      wrong: [
+        { text: "Check how the water level needs to move.", fx: "pulseStart" }, // Starting level … pulses.
+        wrong2,                                                                 // direction glows
+        { text: count, fx: "countSteps" }                                       // the levels highlight one by one
+      ],
+      idle: { text: idle, fx: "pulseMarkerNext" },                              // Lever and the next level gently pulse.
+      success: "small"
+    },
+    entry: {
+      vo: "Enter the new water level.",
+      ost: "Enter the new water level.",
+      correct: `Correct! The new water level is ${t}.`,                         // Equation completes.
+      wrong: [
+        { text: "Try again. Check where the lever stopped.", fx: "pulseMarker" }, // Lever at … pulses.
+        { text: "Look at the number beside the lever.",      fx: "glowTarget" },  // … on the scale glows.
+        { text: `Enter ${t} on the screen.`,                 fx: "pulseKeys" }    // sign and number buttons pulse.
+      ],
+      idle: { text: "Enter the new water level.", fx: "pulsePad" },
+      success: "marked"
+    }
+  };
+}
+
+/** Level 3 example: keypad only; the lever moves by itself after the answer. */
+function q3(id, start, target, eq, change, wrong1, count, wrong3) {
+  const a = start === 0 ? "0" : `(${signed(start)})`;
+  const b = eq.b < 0 ? `(${signed(eq.b)})` : String(eq.b);
+  return {
+    type: "question", id, section: "level3", start, target, eq, autoLever: true,
+    entry: {
+      vo: `The water level ${change}. Enter the new water level.`,
+      ost: `${a} ${eq.op} ${b} = ?\nEnter the new water level.`,
+      correct: `Correct! The new water level is ${signed(target)}.`,           // Lever automatically moves …
+      wrong: [
+        { text: wrong1, fx: "pulseStart" },                                     // Starting level … pulses.
+        { text: count,  fx: "countSteps" },                                     // the levels highlight one by one
+        { text: wrong3, fx: "pulseTargetSign" }                                 // the answer on the scale and its sign button pulse
+      ],
+      idle: { text: "Enter the new water level.", fx: "pulsePad" },             // Dial pad gently pulses.
+      success: "marked"
+    }
+  };
+}

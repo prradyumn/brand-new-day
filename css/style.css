@@ -35,6 +35,7 @@ button { font-family: inherit; cursor: pointer; }
   overflow: clip;   /* clip can't be scrolled by focus/scrollIntoView (hidden can) */
   background: #7cc3f0;
 }
+#stage.zoomed { position: relative; }   /* scaled with CSS zoom (game.js fitStage); #viewport centres it */
 #stage > * { position: absolute; }
 .hidden { display: none !important; }
 
@@ -47,7 +48,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------------- Number plate (Figma "Group 20") ---------------- */
 #plate {
-  left: 287px; top: 265px; width: 501px; height: 167px;
+  left: 273px; top: 265px; width: 501px; height: 167px;   /* centred on the keypad (x 523.5) */
   background: url(../assets/plate-blue.png) center / 100% 100% no-repeat;
   display: grid; place-items: center;
   z-index: 7;
@@ -63,7 +64,7 @@ button { font-family: inherit; cursor: pointer; }
 #plate.flash #plateText { animation: numFlash .9s ease; }
 
 #connector {
-  left: 522px; top: 420px; width: 7px; height: 45px;
+  left: 520px; top: 420px; width: 7px; height: 45px;
   background: #1c1c1c; border-radius: 3px; z-index: 5;
 }
 /* hidden while the transition gate is on screen */
@@ -73,7 +74,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------------- Equation panel (Level 2/3) ---------------- */
 #eqPanel {                /* top strip of the keypad in level mode */
-  left: 272px; top: 433px; width: 507px; height: 146px;
+  left: 270px; top: 433px; width: 507px; height: 146px;   /* same width and centre as the keys */
   border: 30px solid transparent;
   border-image: url(../assets/strip-cream.png) 90 fill / 30px stretch;
   display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -160,6 +161,13 @@ button { font-family: inherit; cursor: pointer; }
 #panel.locked .key, #panel.locked .pad-btn { filter: saturate(.55) brightness(.95); pointer-events: none; }
 #panel.nudge { animation: pulseSoft 1.2s ease 2; }
 #panel.activate { animation: panelActive 1.2s ease; }
+/* "+ and 2 buttons pulse" / "Check icon glows" */
+.key.keypulse, .pad-btn.keypulse { animation: keyPulse .9s ease-in-out 3; }
+@keyframes keyPulse {
+  0%,100% { transform: scale(1); filter: none; }
+  50% { transform: scale(1.14); filter: brightness(1.2) drop-shadow(0 0 12px #fff38a) drop-shadow(0 0 22px #ffd000); }
+}
+#plate.glowing { animation: btnGlow 1s ease-in-out 3; }
 
 /* ---------------- Pipes ---------------- */
 .pipe { pointer-events: none; }
@@ -296,6 +304,7 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes leverRipple { from { opacity: .95; transform: scale(.55); } to { opacity: 0; transform: scale(1.45); } }
 .lever-btn.glow { animation: btnGlow 1s ease-in-out 3; }
 .lever-btn:disabled { cursor: default; }
+#stage.lever-lit .lever-btn { z-index: 42; }   /* above the focus glass while the tank is in the spotlight */
 
 /* Marker (Figma "Line 13") */
 #marker {
@@ -314,6 +323,11 @@ button { font-family: inherit; cursor: pointer; }
 #marker.locked svg { animation: lockFlash .9s ease; }
 #marker.disabled { pointer-events: none; }
 #marker.nudge { animation: none; }
+#marker.glowing svg { animation: markerGlow .9s ease-in-out 3; }     /* "Marker at 0 glows." */
+@keyframes markerGlow { 50% { filter: brightness(1.5) drop-shadow(0 0 12px #fff) drop-shadow(0 0 24px #ffd000); } }
+/* Level 3: "The lever isn't working now" — ▲ / ▼ look switched off; the marker still moves by itself */
+#stage.lever-off .lever-btn { filter: grayscale(.85) brightness(.85); }
+#stage.lever-off #marker { cursor: default; }
 .marker-grip {
   position: absolute; left: 10px; top: 12px; width: 26px; height: 16px; border-radius: 8px;
   background: repeating-linear-gradient(90deg, rgba(160,110,0,.6) 0 3px, transparent 3px 7px);
@@ -334,6 +348,7 @@ button { font-family: inherit; cursor: pointer; }
   transition: transform .3s var(--ease-spring);
 }
 #avatar.swap { animation: avatarBounce .5s var(--ease-spring); }
+#avatar.none { visibility: hidden; }            /* "Narrator:" lines have no face */
 #bannerText {
   margin: 0; left: 83px; right: -18px; top: -48px; bottom: -48px;
   display: flex; align-items: center;
@@ -396,7 +411,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .big-btn:active { transform: translateY(5px); }
 .big-btn:disabled { filter: saturate(.4) brightness(.95); cursor: default; }
-#gateBtn { left: 330px; top: 480px; width: 420px; z-index: 20; }
+#gateBtn { left: 313.5px; top: 480px; width: 420px; z-index: 20; }   /* centred on the keypad column */
 #gateBtn.nudge { animation: pulseSoft 1.2s ease-in-out 3; }
 
 .screen {
@@ -458,14 +473,25 @@ button { font-family: inherit; cursor: pointer; }
   animation: badgePop 1.3s var(--ease-spring) forwards;
 }
 .cross-badge { background: radial-gradient(circle at 35% 30%, #ffb3a8, #ef4a3c 60%, #b7231a); box-shadow: 0 10px 30px rgba(0,0,0,.35); animation-duration: .9s; }
-#markedBadge {
-  left: 250px; top: 196px; width: 700px; height: 178px;
+#markedBadge {             /* sits over the number display, centred on it */
+  left: 173.5px; top: 259.5px; width: 700px; height: 178px;
   background: url(../assets/board-green.png) center / 100% 100% no-repeat;
   display: grid; place-items: center; z-index: 61; pointer-events: none;
   opacity: 0; transform: scale(.4) translateY(-30px);
 }
 #markedBadge span { color: #fff; font-size: 52px; font-weight: 900; text-shadow: 0 4px 0 rgba(0,0,0,.35); transform: translateY(-4px); }
+#markedBadge.lvl { top: 199.5px; }        /* level mode: the display is higher */
 #markedBadge.show { animation: markedIn 2.2s var(--ease-spring) forwards; }
+/* Story end: completion badge */
+#medal {
+  left: 810px; top: 320px; width: 300px; height: 300px; z-index: 61; pointer-events: none;
+  border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #fff6b0, #ffd21a 45%, #e89b00 100%);
+  border: 14px solid #fff; box-shadow: 0 0 0 10px #ff9a1f, 0 20px 50px rgba(0,0,0,.35), 0 0 60px rgba(255, 210, 0, .8);
+  opacity: 0; transform: scale(.3);
+}
+#medal span { color: #fff; font-size: 170px; line-height: 1; text-shadow: 0 6px 0 rgba(170, 90, 0, .55); }
+#medal.show { animation: markedIn 3.1s var(--ease-spring) forwards; }
 #confetti { left: 0; top: 0; width: 1920px; height: 1080px; z-index: 62; pointer-events: none; }
 
 .shake { animation: shake .45s ease; }
@@ -494,6 +520,53 @@ button { font-family: inherit; cursor: pointer; }
   background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.95), rgba(255,255,255,.25) 45%, rgba(255,255,255,.06) 70%);
   border: .25vmin solid rgba(255,255,255,.7);
 }
+
+/* ---------------- Story: full-screen scenes ---------------- */
+#story { inset: 0; width: 1920px; height: 1080px; z-index: 70; overflow: hidden; background: #0d1a2e; }
+#story .shot { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; will-change: transform; }
+#story .shot.on { opacity: 1; }
+#story .shot img { display: block; width: 1920px; height: 1080px; }
+#story .spots { position: absolute; inset: 0; pointer-events: none; }
+/* a level mark on the scene art lighting up */
+#story .spot {                       /* a halo ring around the number: the number itself stays readable */
+  position: absolute; width: 150px; height: 104px; margin: -52px 0 0 -75px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 225, 80, 0) 0 58%, rgba(255, 214, 50, .85) 72%, rgba(255, 200, 0, 0) 100%);
+  opacity: 0; transform: scale(.4);
+  transition: opacity .35s, transform .45s var(--ease-spring);
+}
+#story .spot.neg { background: radial-gradient(closest-side, rgba(90, 180, 255, 0) 0 58%, rgba(60, 160, 255, .85) 72%, rgba(40, 140, 255, 0) 100%); }
+#story .spot.on { opacity: 1; transform: scale(1); animation: spotPulse 1.6s ease-in-out .45s infinite; }
+@keyframes spotPulse { 50% { transform: scale(1.18); opacity: .8; } }
+#story .sign {
+  position: absolute; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 104px; font-weight: 900; line-height: 1; color: #fff;
+  border: 7px solid #fff; box-shadow: 0 10px 26px rgba(0, 0, 0, .3);
+  opacity: 0; transform: scale(.3); transition: opacity .3s, transform .5s var(--ease-spring);
+}
+#story .sign.plus { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5b400 60%, #d68f00); }
+#story .sign.minus { background: radial-gradient(circle at 35% 30%, #8fd0ff, #2b8cf2 60%, #1466d4); }
+#story .sign.on { opacity: 1; transform: scale(1); }
+#story .sign span { transform: translateY(-6px); }
+
+/* Speech bubble: the artwork keeps its own proportions (width set, height from the image);
+   the text sits in the bubble's inner area and the font shrinks to fit. */
+#bubble { position: absolute; opacity: 0; transform: scale(.55); pointer-events: none;
+  transition: opacity .25s ease, transform .45s var(--ease-spring); }
+#bubble.on { opacity: 1; transform: scale(1); }
+#bubble img { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(0, 30, 70, .25)); }
+#bubble.flip img { transform: scaleX(-1); }
+#bubbleText {
+  position: absolute; margin: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; font-weight: 900; line-height: 1.12; color: #111; overflow: hidden;
+}
+/* Narrator line: text straight on the scene (as dialogue_p01), with a soft light halo for legibility */
+#caption {
+  position: absolute; left: 230px; right: 230px; top: 30px; margin: 0; text-align: center;   /* clear of the ⏭ 🔊 buttons */
+  font-size: 46px; font-weight: 700; line-height: 1.22; color: #111;
+  text-shadow: 0 0 4px #fff, 0 0 10px rgba(255, 255, 255, .95), 0 0 22px rgba(255, 255, 255, .8), 0 0 36px rgba(255, 255, 255, .6);
+  opacity: 0; transform: translateY(-12px); transition: opacity .5s, transform .5s var(--ease-out);
+}
+#caption.on { opacity: 1; transform: none; }
 
 /* ---------------- HUD ---------------- */
 .hud-btn {

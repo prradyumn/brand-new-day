@@ -42,7 +42,8 @@
       </div>
       <div id="plate" class="hidden"><span id="plateText">0</span></div>
 
-      <!-- Equation (Level 2/3): sits on top of the keypad in level mode, beside the tank -->
+      <!-- Equation (Level 2/3): sits on top of the keypad in level mode, beside the tank.
+           In the Level 2 teaching rows it shows the row's example equation ("1 + 2 = ?"). -->
       <div id="eqPanel" class="hidden" aria-live="polite">
         <span id="eqA"></span><span id="eqOp"></span><span id="eqB"></span><span id="eqEq">=</span><span id="eqAns">?</span>
       </div>
@@ -103,7 +104,17 @@
       <!-- ============ FEEDBACK FX ============ -->
       <div id="fxLayer"></div>
       <div id="markedBadge"><span></span></div>
+      <!-- Story end: "completion badge" -->
+      <div id="medal" aria-hidden="true"><span>★</span></div>
       <canvas id="confetti" width="1920" height="1080"></canvas>
+
+      <!-- ============ STORY (full-screen scenes before How to Play) ============ -->
+      <div id="story" class="hidden" aria-live="polite">
+        <div class="shot"><img alt="" draggable="false" /><div class="spots"></div></div>
+        <div class="shot"><img alt="" draggable="false" /><div class="spots"></div></div>
+        <p id="caption"></p>
+        <div id="bubble"><img alt="" draggable="false" /><p id="bubbleText"></p></div>
+      </div>
 
       <!-- ============ HUD ============ -->
       <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
@@ -141,6 +152,7 @@
   <div id="under" class="hidden" aria-hidden="true"><div class="rays"></div><div class="bubbles"></div></div>
 
   <script src="js/data.js"></script>
+  <script src="assets/vo/manifest.js"></script>  <!-- recorded voice-over clips (tools/generate-audio.mjs) -->
   <script src="js/fx.js"></script>
   <script src="js/game.js"></script>
 </body>
