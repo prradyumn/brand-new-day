@@ -1,6 +1,6 @@
 # Integers: Rise and Fall — How to Play + Levels 1–3
 
-This is a plain HTML, CSS and JavaScript game with no build step and no libraries. It follows **"Integers_Rise and Fall - Story n Game V3 (1).csv"** from the "How to Play" table onward: How to Play, Level 1, the Level 2 transition and game, the Level 3 transition and game, and the Story End. The intro/teaching story rows before "How to Play" are not part of the game. The layout matches **Figma → Integers → page "LBD" → Section 2** (Slide 16:9 – 16 / 18 / 19 / 20).
+This is a plain HTML, CSS and JavaScript game with no build step and no libraries. It follows **"Integers_Rise and Fall - Story n Game V3.csv"** from the "How to Play" table onward: How to Play, Level 1, the Level 2 transition and game, the Level 3 transition and game, and the Story End. The intro/teaching story rows before "How to Play" are not part of the game. The layout matches **Figma → Integers → page "LBD" → Section 2** (Slide 16:9 – 16 / 18 / 19 / 20).
 
 **Content rule:** every spoken line and every piece of on-screen text comes from the CSV. `data.js` copies it verbatim, with speaker labels ("Guddu Bhaiya:") and quote marks removed. The engine adds no dialogue or captions of its own. Buttons use the CSV's "Start" or icons (▶ ↻ ⏸).
 
@@ -84,17 +84,20 @@ Start screen (▶ = user gesture, unlocks speech; the first story scene sits beh
   Level 3      S0, R2–R6  "the lever isn't working now": ▲/▼ switch off, keypad glows, first challenge appears
                B0     tutorial 0 + 4 (keypad only), no incorrect feedback
                B1…B6  (+4) + 3, (+7) − 6, (+1) − 5, (−4) − 2, (−6) + 3, (−3) + 2  (keypad; the lever moves by itself)
-  Story End    Z1–Z5  display glows, confetti, integers highlighted, lever sweeps − → 0 → +, completion badge
+  Story End    Z1     display glows (at the Level 3 tank)
+               ── camera pulls back out of the tank ──
+               Z2–Z5  full-screen scenes: celebration + confetti, integers highlighted, lever sweeps − → 0 → +,
+                      zoom out to the village + completion badge
 End screen (confetti, ↻ = reload)
 ```
 
-**Step types** (`data.js`): `demo` (How to Play), `question`, `gate` (transition dialogue that waits for Start or a tap), `say` (a spoken row plus the animation in its Scene Description). `section` decides the dive: a new section = dive into the tank. The Story End plays on at the Level 3 tank.
+**Step types** (`data.js`): `scene` (a full-screen story scene: the intro and Story End Z2–Z5), `demo` (How to Play), `question`, `gate` (transition dialogue that waits for Start or a tap), `say` (a spoken row plus the animation in its Scene Description). `section` decides the dive: a new section = dive into the tank. The Story End plays on at the Level 3 tank (no dive): Z1 is on the game screen, then `storyEnter()` pulls the camera back out of the tank into the Story End scenes.
 
-**Speakers:** `guddu` (default), `pari`, `narrator`. The banner avatar changes (Pari's is `assets/pari-happy.png`, cropped from `pari-full.png`; "Narrator:" lines have no face) and Pari's voice is pitched a little higher. All feedback lines are Guddu Bhaiya's.
+**Speakers:** `guddu` (default), `pari`, `narrator`. The banner avatar changes (Pari's is `assets/pari-happy.png`, the story Pari facing the text; "Narrator:" lines have no face) and Pari's voice is pitched a little higher. All feedback lines are Guddu Bhaiya's.
 
 ### Story (`runScene()` in `game.js`)
 
-Ten scenes from the CSV story rows, word for word, before How to Play. Scene art: `assets/story/scene-pXX.jpg` (web copies of `assets/scene_pXX_background_clean.png`, 5 MB instead of 23 MB).
+Ten scenes from the CSV story rows, word for word, before How to Play, and four more for the Story End (Z2–Z5, table below). Scene art: `assets/story/scene-pXX.jpg` (web copies of `assets/scene_pXX_background_clean.png`, 5 MB instead of 23 MB).
 
 | Step | Art | Speaker | CSV row |
 |---|---|---|---|
@@ -106,7 +109,21 @@ Ten scenes from the CSV story rows, word for word, before How to Play. Scene art
 | ST6 | p08 | Guddu | "Below 0, there is less water…" (−1, −2, −3 light one by one) |
 | ST8 | p09 | Guddu | "…negative numbers." (+ "−" sign) |
 | ST9 | p10 | Pari | "Oh! so, below 0 is negative…" (all levels light) |
-| ST10 | p04 | Guddu | Game start: "Correct, Let's mark the correct water level." (0 glows) |
+| ST10 | p04 | Guddu | Game start: "Correct, Let's mark the correct water level now." (0 glows) |
+
+Story End scenes (`p11` and `p12` were made for the ending: sunny, the rain has stopped):
+
+| Step | Art | Speaker | CSV row |
+|---|---|---|---|
+| Z1 | game screen | Guddu | "Great work! …" (display glows, sparkle) |
+| Z2 | p11 | Pari | "We did it! …" (confetti, `fx: "celebrate"`) |
+| Z3 | p11 | Guddu | "…are called integers." (−1, −2, −3, then 0, then +1, +2, +3 light) |
+| Z4 | p11 | Pari | "So integers helped us…" (`sweep`: a lever marker slides −3 → 0 → +3, lighting each mark) |
+| Z5 | p12 | Guddu | "Excellent! …" (camera `from: 1.5` zooms out to the village, completion badge, `fx: "badge"`) |
+
+* `p11` scale marks (stage px): x ≈ 920, +3 … −3 at y 310 / 400 / 482 / 553 / 653 / 743 / 842. The water is at −1, the last Level 3 answer.
+* A scene step can take `fx` (`celebrate`, `badge`); it runs through `sayFx()` while the line plays. `#fxLayer`, `#medal` and `#confetti` sit above `#story` (z-index 72–74) for this.
+* Z5's zoom is centred on the bubble's tail tip, so the bubble keeps pointing at Guddu while the camera pulls back. After Z5 the end card appears over the village scene.
 
 * **Speech bubbles** use the two artworks as they are, never stretched: `asset_speech_bubble_blank.png` (round, tail bottom-left) and `asset_p09_overlay_….png` (wide, tail bottom-right). `BUBBLES` in `game.js` holds their measured tail tip and inner text area. A scene sets `bubble: { shape, tail, w, tip }`: the width, and the point the tail aims at (the speaker). A tail on the other side mirrors the artwork only, never the text. The text is bold black and centred in the inner area, and its font shrinks to fit (50 → 20 px), so the bubble never changes shape.
 * **Narrator line (ST1)** is a caption straight on the scene, as in `dialogue_p01.png`, with a soft white halo. It is inset so it stays clear of the ⏭ / 🔊 buttons.
@@ -120,6 +137,13 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 
 1. **Lever part** (`leverPart()`): the VO plays, the OST stays in the banner, the learner drags the marker or taps ▲/▼. When the marker has rested `settleMs` (1.3 s) it is checked: at the target → correct; still at the start → ignored; anywhere else → a wrong attempt. Correct: "Marker locks", small ✓ + sparkle, and the correct line ("Correct! You reached +2.").
 2. **Entry part** (`entryPart()`): the VO ("Enter the new water level."), then the learner types sign + digits and presses **Check**. Correct: the value appears on the display and glows, the equation completes, "✓ Sparkle + Water Level Marked!" (board + confetti; the Level 1 tutorial gets only ✓ + sparkle), then the correct line. Level 3 (`autoLever`) has only this part; after the answer the lever moves by itself, level by level, and the water follows.
+
+**The equation builds in step with the voice-over** (`buildTeachEq()`, `buildQuestionEq()`, `untilWord()` in `game.js`).
+* Equation pieces wait hidden (`.eqhide` keeps their space, so nothing shifts) and pop in (`.eqpop`) on their word.
+* **Level 2 teaching (P3, P5):** "If the water level is at +1" → `1`, "and rises" → `+`, "by 2 levels" → the levels light up one by one and the number counts 1, 2 with them, then `= ?`. The cue words are in each row's `build: { a, op, b }`.
+* **P4 / P6:** the sign lights up on "add" / "subtract" (`opGlow`), the lever starts on "new water level" (`moveAt`), and the answer appears when it stops.
+* **Level 2/3 questions:** the start level comes up with the question. The sign appears on "rises" / "goes up" / "goes down", the number on "3 levels", then `= ?`. A0 and B0 skip this, because TR2 / R5 already show their equation.
+* **Timing:** `FX.progress(text)` in `fx.js` gives how far the current line has got (0…1). For a recorded clip that's its playhead; for the browser voice, or when muted, it's the reading time. A word's place is its share of the text, plus a little for the pause at each , . ! ? (`wordAt()`). If the line never plays, `untilWord()` gives up after twice the reading time, so the game can't get stuck.
 
 **Sign rule:** positive answers need "+", negative answers need "−", 0 needs no sign.
 
@@ -159,9 +183,9 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 ## 5. Focus / glass effect
 
 * `#focus` is a full-stage layer with `backdrop-filter: blur(10px) saturate brightness` and a light tint and sheen.
-* The "spotlight" is a `clip-path: path(evenodd, …)` with **two rounded-rect holes** (see `HOLES` and `focusOn()` in `game.js`). The path always has the same shape, so the holes **animate smoothly** between targets.
-* **How to Play and the Level 1 tutorial only (`guided`).** Usually one highlight at a time: the spotlight moves narrator box → tank → keypad, and the others are blurred (How to Play step 5 lights the keypad and the tank together). The tank hole starts right of the narrator box; ▲ / ▼ stick out to its left, so while the tank is lit they are raised above the glass (`#stage.lever-lit`) and stay sharp and pressable. `focusOn()` does nothing once `S.guided` is false (from TR1 on). Feedback and hint lines use `sayFocused()`: the spotlight moves to the narrator box while Guddu speaks, then goes back.
-* An unused hole is parked off-stage as `NO_HOLE`. This matters because two identical holes cancel each other under the even-odd rule.
+* The "spotlight" is a `clip-path: path(evenodd, …)` with **three rounded-rect holes**, one per slot: narrator box, tank, keypad (see `HOLES` and `focusOn()` in `game.js`). The path always has the same shape, so the holes **animate smoothly**.
+* **How to Play and the Level 1 tutorial only (`guided`).** **The narrator box stays lit the whole time**, so the instruction can always be read. Beside it, the tank or the keypad is lit, and the other is blurred (How to Play step 5 lights both). While a line is spoken (`focusOn("narr")`), only the narrator box is lit. The tank hole starts right of the narrator box; ▲ / ▼ stick out to its left, so while the tank is lit they are raised above the glass (`#stage.lever-lit`) and stay sharp and pressable. `focusOn()` does nothing once `S.guided` is false (from TR1 on). Feedback and hint lines use `sayFocused()`: the tank or keypad blurs while Guddu speaks, then lights again.
+* A closed hole shrinks to zero size at its own centre (`shut()`), so the holes open and close in place and never slide across each other. **Holes must not overlap.** Under the even-odd rule an overlap cancels out and shows as blur, which is why the narrator hole ends at x 1092, just left of the tank hole (x 1094). Each hole has its own halo ring (`ring0` narrator, `ring1` tank, `ring2` keypad).
 * Clicks outside the holes are blocked, because the layer is clipped and hit-testing follows the clip.
 * During narration the character is raised above the glass (`z-index: 45`) instead of getting a hole.
 
@@ -194,7 +218,7 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 | `board-green.png` | "Water Level Marked!" board |
 | `panel-title.png` | Start/end card |
 | `drop.png` | Water drop (user-supplied reference, trimmed to 480 px). Currently unused: it was the earlier drop wipe, kept for later use |
-| `pari-happy.png` | Pari's banner avatar, cropped from `pari-full.png` |
+| `pari-happy.png` | Pari's banner avatar: the story Pari (blue dress, two braids with red bows), cut out of `scene_p03_background_clean.png` with macOS Vision's subject lift and mirrored so she faces the text. `pari-full.png` is an older design (yellow kurta) and isn't shown: no guided step has Pari speaking |
 | `sfx/water-fill.mp3` | Mixkit "Filling sink with water" (#1819), trimmed to a 7 s loop. Mixkit Free Sound Effects License |
 | `sfx/water-drain.mp3` | Mixkit "Sink drain" (#1878), trimmed to a 10 s loop. Mixkit Free Sound Effects License |
 | `sfx/key.wav` · `lever.wav` · `tick.wav` · `button.wav` · `board.wav` · `wrong.wav` · `flip.wav` | Mixkit #1120 click box check · #2568 interface click tone · #1317 water bubble · #3005 light pop · #2357 bubble pop-up · #2569 negative tone tap · #1104 page turn. Trimmed so each starts on its first sound, peak-normalised, and saved as WAV so short clicks don't lag. Mixkit Free Sound Effects License |
@@ -208,7 +232,7 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 * **Text / numbers:** edit `js/data.js` only. Add a question with `start`, `target` and a `lever` and/or `entry` part (`vo`, `ost`, `correct`, `wrong[3]` or `null`, `idle`, `success`), optionally `eq: { a, op, b }`, `liveEq`, `autoLever`, `guided`, `plateStart`. The `q1()` / `q2()` / `q3()` builders at the bottom of `data.js` make the repeated Level 1/2/3 example rows. Keep text verbatim from the CSV.
 * **Timing:** `config.settleMs`, `config.inactivityMs`.
 * **Sign rule:** `config.requireSignForPositive` is `true`, because the CSV says the learner "presses + and 4". Set it to `false` to accept "4" as well as "+4". Negative answers always need "−".
-* **Voice-over:** every line is pre-recorded with **Gemini TTS** (`gemini-3.8-flash-tts`, English–India) into `assets/vo/*.mp3`. `assets/vo/manifest.js` maps `"speaker|line"` to its clip, and `FX.speak(text, { speaker })` plays it. A line without a clip, or whose clip can't play, is read by the browser's SpeechSynthesis (prefers an `en-IN` voice) as before. Either way the promise resolves only when the line has finished. Casting: Guddu Bhaiya = *Puck*, Pari = *Leda*, narrator = *Kore* (`VOICES` in `tools/generate-audio.mjs`). 🔊/🔇 in the top-right corner mutes the voice, music and sound effects (`FX.setMuted`). Muting mid-line doesn't skip ahead: the line goes quiet and its text stays up for its reading time.
+* **Voice-over:** every line is pre-recorded with **Gemini TTS** (`gemini-3.8-flash-tts`, English–India) into `assets/vo/*.mp3`. `assets/vo/manifest.js` maps `"speaker|line"` to its clip, and `FX.speak(text, { speaker })` plays it. A line without a clip, or whose clip can't play, is read by the browser's SpeechSynthesis (prefers an `en-IN` voice) as before. Either way the promise resolves only when the line has finished. The browser voice only counts as started when it fires `onstart`. Chrome can report `speaking` while no sound comes out and then never finish the line. Before this check, that froze the story for about 20 s per line; now the text stays up for its reading time and the game carries on. **Every line needs a recorded clip** so this fallback never comes up. After any script change, re-record (below). Casting: Guddu Bhaiya = *Puck*, Pari = *Leda*, narrator = *Kore* (`VOICES` in `tools/generate-audio.mjs`). 🔊/🔇 in the top-right corner mutes the voice, music and sound effects (`FX.setMuted`). Muting mid-line doesn't skip ahead: the line goes quiet and its text stays up for its reading time.
 * **Background music:** `assets/music/bg-loop.mp3` is a soothing instrumental made with **Lyria 3** (bansuri, marimba, acoustic guitar, soft tabla; ~2:46, the end crossfades into the start so it loops seamlessly). It starts on the ▶ tap, dips to 45 % under every spoken line, and pauses while muted or while the learner is away (`FX.loadMusic` / `FX.startMusic` in `fx.js`). The file is mixed quiet (−24 LUFS, voice clips −16 LUFS) because iOS ignores element volume.
 * **Re-recording after a script change:** edit `js/data.js`, then run `GEMINI_API_KEY=… node tools/generate-audio.mjs` (needs Node 18+ and ffmpeg). It records only new or changed lines and deletes clips that are no longer used. Every clip is transcribed and compared with the script word for word; a clip where the voice ad-libs or drops words is recorded again (up to 4 tries), and any line that still fails is listed and falls back to the browser voice. `--force` re-records everything, `--music` also makes a new music loop. **The key is read from the environment only. Never put it in the game files: they are public once deployed.** `tools/` is excluded from the Vercel upload.
 * **Unlocking audio:** Safari and iOS only allow speech and audio that start from a tap. The Play click calls `FX.unlockSpeech()` (a silent utterance, and a volume-0 play of the shared clip player), `FX.unlockSfx()` (an unmuted play at volume 0) and `FX.startMusic()` synchronously. If the browser still won't speak, the 🔊 button gets a red ring (`fx:voiceproblem` event) and the reason is logged to the console as `[voice] …`. While the game waits because the window lost focus, a ⏸ card is shown; a click resumes.
@@ -224,9 +248,10 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 
 ## 10. Known decisions / open points
 
-* **How to Play example numbers are not in the CSV.** The "Game start" row says the lever is above 0, so the demo starts at +2, taps ▲ then ▼ ("up or down as shown"), drags to +4, types 4 then + (the CSV introduces the number in step 3 and the sign in step 4) and presses Check. Change them in `data.js` (H1–H4).
+* **How to Play example numbers.** The "Game start" row says the lever is above 0, so the demo starts at +2. Step 1 taps ▲ then ▼ ("up or down as necessary"). Its example, "Like water rises 2 levels up", is played in step 2: the lever is dragged +2 → +4. Then the demo types 4 then + (the CSV introduces the number in step 3 and the sign in step 4) and presses Check. Change them in `data.js` (H1–H4).
 * The Level 1 tutorial marker starts at +2 ("starts above 0").
-* **The equation panel only ever shows equations.** In the Level 2 teaching rows, the example equations ("1 + 2 = ?", "3 − 5 = −2", `ostIn: "eq"`) go in the panel, written as the CSV writes them. The word captions ("Water level rises → Add", "Rise → Add • Go down → Subtract") are shown in the narrator box after the line, like every other OST. `fitEq()` shrinks the font only if an equation would ever overflow the strip (none do: the widest, "(−2) + (−3) = −5", uses 345 of 447 px).
-* Fixed CSV typos: "thje" → "the" (Level 2 example 2), stray closing quotes in OSTs. Everything else is word for word, including where VO and OST differ (Level 2 example 3, Story End row 4).
+* **The equation panel only ever shows equations.** In the Level 2 teaching rows, the example equations ("1 + 2 = ?", "3 − 5 = −2", `ostIn: "eq"`) go in the panel, written as the CSV writes them. The word captions ("Water level rises → Add", "Rise → Add • Go down → Subtract") are shown in the narrator box after the line, like every other OST. Each piece of the equation sits on its own card in the cream strip, following the reference mock (`screen-mock-01.png`): white number cards, smaller cream cards for the signs, and a light-blue answer card with a blue outline. Card sizes are in `em`, so `fitEq()` shrinks the cards along with the font when an equation would overflow the strip. Only the widest one does: "(−2) + (−3) = ?" goes from 46 to 44 px.
+* Fixed CSV typos: "thje" → "the" (Level 2 example 2), "2 level up" → "2 levels up" (How to Play step 1), stray closing quotes in OSTs, and missing full stops at the end of the story lines and How to Play step 1. Everything else is word for word, including where VO and OST differ: Story rows "than required" / "than requirement", Level 2 example 3, Story End rows 4 and 5 (VO "Integers Expert", OST "Water Level Expert").
+* **The story's first row (ST1) has no OST in the CSV ("—")**, but the narrator's line is shown as a caption on the scene, matching the reference art `dialogue_p01.png`. This is the one place on-screen text isn't in the CSV's OST column. The decision was made on 2026-10-01.
 * The water follows the marker in every level.
 * **The VO always completes.** There's no tap-to-skip. `FX.speak()` resolves only when the speech engine has finished.

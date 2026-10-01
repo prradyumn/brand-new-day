@@ -36,15 +36,16 @@
   const LABEL_X = 1329;        // centre of the level labels (for sparkles)
 
   /* Spotlight holes for the focus layer */
+  // Holes must never overlap: under evenodd an overlap cancels out and shows as blur.
   const HOLES = {
-    narr:   { x: 12,   y: 6,   w: 1089, h: 160 },
+    narr:   { x: 12,   y: 6,   w: 1080, h: 160 },   // ends at x 1092, just left of the tank hole
     tank:   { x: 1094, y: 26,  w: 736,  h: 1064 },   // starts right of the narrator box; ▲ / ▼ are lifted above the glass (lever-lit)
     padTut: { x: 196,  y: 250, w: 656,  h: 716 },
     gate:   { x: 289.5, y: 460, w: 468,  h: 160 }
   };
-  // Two identical holes cancel out under evenodd, so unused slots get a
-  // 2×2 px hole parked off-stage (keeps the path shape stable for transitions).
-  const NO_HOLE = { x: -40, y: -40, w: 2, h: 2 };
+  // A closed hole: zero size at the centre of its rect, so it shrinks into and
+  // grows out of its own place (the path keeps the same shape for transitions).
+  const shut = (h) => ({ x: h.x + h.w / 2, y: h.y + h.h / 2, w: 0, h: 0 });
 
   /* Who is speaking: banner avatar, full-size art (guided steps) and voice pitch */
   const SPEAKERS = {
@@ -55,7 +56,7 @@
 
   /* ---------------- DOM ---------------- */
   const el = {
-    stage: $("stage"), focus: $("focus"), ring0: $("ring0"), ring1: $("ring1"),
+    stage: $("stage"), focus: $("focus"), ring0: $("ring0"), ring1: $("ring1"), ring2: $("ring2"),
     banner: $("banner"), bannerText: $("bannerText"), avatar: $("avatar"), character: $("character"),
     plate: $("plate"), plateText: $("plateText"), connector: $("connector"),
     panel: $("panel"),
@@ -314,32 +315,39 @@
   function focusOn(key) {
     if (key && !S.guided) key = null;   // the spotlight is only used in guided steps
     if (!key) {
-      S.focusKey = null;
+      S.focusKey = null; S.focusOpen = null;
       el.stage.classList.remove("lever-lit");
       el.focus.classList.remove("on");
-      el.ring0.classList.remove("on"); el.ring1.classList.remove("on");
+      el.ring0.classList.remove("on"); el.ring1.classList.remove("on"); el.ring2.classList.remove("on");
       return;
     }
-    // Usually one highlight at a time: the second slot stays parked (NO_HOLE)
-    // so the path keeps the same shape and the hole animates between targets.
+    // The narrator box stays lit the whole time so the instruction can always be read.
+    // `key` picks what is lit beside it; the tank and keypad holes each have their own
+    // slot and open/close in place, so a hole never slides across the narrator box.
     const sets = {
-      narr: [HOLES.narr, NO_HOLE],
-      tank: [HOLES.tank, NO_HOLE],
-      pad: [HOLES.padTut, NO_HOLE],
-      padTank: [HOLES.padTut, HOLES.tank],   // How to Play step 5: "Both glow"
-      gate: [HOLES.gate, NO_HOLE]
+      narr: {},
+      tank: { tank: HOLES.tank },
+      pad: { pad: HOLES.padTut },
+      padTank: { pad: HOLES.padTut, tank: HOLES.tank },   // How to Play step 5: "Both glow"
+      gate: { pad: HOLES.gate }
     };
-    const [a, b] = sets[key];
+    const open = sets[key];
+    if (open.pad) S.padHole = open.pad;
+    const tank = open.tank || shut(HOLES.tank);
+    const pad = open.pad || shut(S.padHole || HOLES.padTut);
     // ▲ / ▼ poke out left of the tank spotlight: raise them above the glass so they stay sharp and pressable
-    el.stage.classList.toggle("lever-lit", key === "tank" || key === "padTank");
-    el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(a)} ${rr(b)}")`;
+    el.stage.classList.toggle("lever-lit", !!open.tank);
+    el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(HOLES.narr)} ${rr(tank)} ${rr(pad)}")`;
     el.focus.style.webkitClipPath = el.focus.style.clipPath;
     el.focus.classList.add("on");
-    const moved = S.focusKey !== key;
-    S.focusKey = key;
-    placeRing(el.ring0, a, true);
-    if (moved) FX.flash(el.ring0, "sweep", 1700);
-    placeRing(el.ring1, b, b !== NO_HOLE);
+    const was = S.focusOpen || {};
+    if (key === "narr" && S.focusKey !== key) FX.flash(el.ring0, "sweep", 1700);   // a new line: light sweeps the narrator box
+    if (open.tank && !was.tank) FX.flash(el.ring1, "sweep", 1700);
+    if (open.pad && was.pad !== open.pad) FX.flash(el.ring2, "sweep", 1700);
+    S.focusKey = key; S.focusOpen = open;
+    placeRing(el.ring0, HOLES.narr, true);
+    placeRing(el.ring1, tank, !!open.tank);
+    placeRing(el.ring2, pad, !!open.pad);
   }
 
   /* =================================================================
@@ -647,7 +655,7 @@
   }
 
   /** Highlight each level from `from` toward `to` one by one (optionally the start mark first). */
-  async function countPath(from, to, withStart = false) {
+  async function countPath(from, to, withStart = false, onStep = null) {
     const dir = Math.sign(to - from);
     const path = [];
     for (let L = withStart ? from : from + dir; L !== to + dir; L += dir) path.push(L);
@@ -659,6 +667,7 @@
       if (!lab) continue;
       lab.classList.add("lit");
       if (L !== from) FX.sparkle(el.fx, LABEL_X, levelY(L), 6, 50);
+      if (onStep) onStep(path.indexOf(L) + 1);
       await FX.sleep(520);
     }
     await FX.sleep(700);
@@ -695,6 +704,7 @@
      { answer } completes it ("0 + 3 = +3"). */
   function renderEq(q, { moved = null, answer = null } = {}) {
     const e = q.eq, live = moved !== null && moved !== 0;
+    eqParts().forEach((n) => n.classList.remove("eqhide"));
     el.eqA.textContent = termA(e.a);
     el.eqOp.textContent = e.op;
     el.eqB.textContent = termB(live ? moved : e.b);
@@ -705,9 +715,20 @@
   }
   /** Level 2 teaching rows: the row's OST equation, written as the CSV writes it
       ("1 + 2 = ?", "3 − 5 = −2"). The panel only ever shows equations. */
-  function showTeachEq(text) {
+  async function showTeachEq(text, { build = false } = {}) {
     const m = /^(.+?) ([+−]) (.+?) = (.+)$/.exec(text);
     if (!m) return;
+    if (build) {                                   // written piece by piece as the line is spoken (buildTeachEq)
+      const shown = !el.eqPanel.classList.contains("hidden");
+      if (shown) { eqHide(eqParts()); await FX.sleep(280); }      // the last example fades out first
+      [el.eqA.textContent, el.eqOp.textContent, el.eqB.textContent, el.eqAns.textContent] = [m[1], m[2], m[3], m[4]];
+      el.eqEq.classList.remove("gone"); el.eqAns.classList.remove("gone");
+      eqHide(eqParts(), true);
+      if (!shown) showEqPanel();
+      fitEq();
+      return;
+    }
+    eqParts().forEach((n) => n.classList.remove("eqhide"));
     const was = el.eqPanel.textContent;
     el.eqA.textContent = m[1]; el.eqOp.textContent = m[2]; el.eqB.textContent = m[3];
     el.eqEq.classList.remove("gone"); el.eqAns.classList.remove("gone");
@@ -728,6 +749,64 @@
     const room = p.clientWidth - 16;                                  // a little air inside the strip
     if (need > room) p.style.fontSize = Math.floor(parseFloat(getComputedStyle(p).fontSize) * room / need) + "px";
   }
+  /* Building the equation in step with the voice-over: pieces start hidden
+     (.eqhide keeps their space, so nothing shifts) and pop in on their word. */
+  const eqParts = () => [el.eqA, el.eqOp, el.eqB, el.eqEq, el.eqAns];
+  function eqHide(parts, instant = false) {
+    parts.forEach((n) => {
+      if (instant) n.style.transition = "none";
+      n.classList.add("eqhide");
+      if (instant) { void n.offsetWidth; n.style.transition = ""; }
+    });
+  }
+  function eqShow(...parts) {
+    parts.forEach((n) => { n.classList.remove("eqhide"); FX.flash(n, "eqpop", 500); });
+    FX.sfx("tick");
+  }
+  /** Where `word` falls in a spoken line, 0…1: its share of the text, plus a
+      little for the pause at each , . ! ? (the clips pause there). */
+  function wordAt(text, word) {
+    const i = text.indexOf(word);
+    if (i < 0) return 0;
+    const w = (t) => t.length + 6 * (t.match(/[,.!?](\s|$)/g) || []).length;
+    return w(text.slice(0, i)) / w(text);
+  }
+  /** Wait until the voice reaches `word` in `text` (gives up if the line never plays). */
+  async function untilWord(text, word) {
+    const at = wordAt(text, word), until = performance.now() + FX.readTime(text) * 2 + 4000;
+    while (FX.progress(text) < at && performance.now() < until) await FX.sleep(40);
+  }
+
+  /** Level 2 teaching example (P3, P5): "If the water level is at +1" → 1,
+      "and rises" → +, "by 2 levels" → the levels light one by one and the
+      number counts 1, 2 with them, then "= ?". */
+  async function buildTeachEq(step) {
+    const b = step.build, vo = step.vo, n = el.eqB.textContent;
+    await untilWord(vo, b.a);
+    eqShow(el.eqA); pulseLevel(step.from);
+    await untilWord(vo, b.op);
+    eqShow(el.eqOp);
+    await untilWord(vo, b.b);
+    await countPath(step.from, step.to, false, (k) => {
+      el.eqB.textContent = String(k); fitEq();
+      el.eqB.classList.remove("eqhide"); FX.flash(el.eqB, "eqpop", 500);
+    });
+    el.eqB.textContent = n; fitEq();
+    eqShow(el.eqEq, el.eqAns);
+    await FX.sleep(400);
+  }
+  /** Level 2/3 question: the start level is up with the question, then the sign
+      on "rises" / "goes up" / "goes down", the number on "3 levels", then "= ?". */
+  async function buildQuestionEq(q, vo) {
+    const dir = /rises|goes up|goes down/.exec(vo);
+    if (dir) await untilWord(vo, dir[0]);
+    eqShow(el.eqOp);
+    await untilWord(vo, `${Math.abs(q.eq.b)} levels`);
+    eqShow(el.eqB);
+    await FX.sleep(450);
+    eqShow(el.eqEq, el.eqAns);
+  }
+
   function completeEq(q) {                        // "Equation completes: (+2) + 3 = +5."
     renderEq(q, { answer: q.target });
     FX.flash(el.eqPanel, "complete", 1000);
@@ -905,12 +984,14 @@
   // Which level a step belongs to. The story end plays on at the Level 3 tank (no dive).
   const levelOf = (step) => (step.section === "end" ? "level3" : step.section);
   // Lever level a step starts from: its own start/level, or the next one that has one
+  // (Story End: none follow, so the last answer, where the lever was left)
   function levelAt(i) {
     for (const s of DATA.steps.slice(i)) {
       if (s.start != null) return s.start;
       if (s.level != null) return s.level;
     }
-    return 0;
+    const last = DATA.steps.slice(0, i).reverse().find((s) => s.target != null);
+    return last ? last.target : 0;
   }
   const firstLine = (s) => s.vo || (s.lever && s.lever.vo) || (s.entry && s.entry.vo) || "";
 
@@ -1032,9 +1113,14 @@
 
     // New question in the same level: the display (and equation) flip over to it
     // while the water re-levels to the new start.
+    // The equation builds with the question's voice-over, unless it is already up
+    // (A0 after TR2 and B0 after R5 show it before the question starts).
+    const full = q.eq && termA(q.eq.a) + q.eq.op + termB(q.eq.b) + "=?";
+    S.eqBuild = !!q.eq && !(!el.eqPanel.classList.contains("hidden") && el.eqPanel.textContent.replace(/\s/g, "") === full);
     const showQuestion = () => {
       setPlate(q.plateStart || fmt(q.start));
       if (q.eq) renderEq(q);
+      if (S.eqBuild) eqHide([el.eqOp, el.eqB, el.eqEq, el.eqAns], true);   // only the start level for now
     };
     const flipping = flip ? flipCards(showQuestion) : (showQuestion(), null);
 
@@ -1059,7 +1145,8 @@
   /** Lever part: VO, the learner moves the marker, "Correct! You reached +2." */
   async function leverPart(q, p) {
     S.part = p; S.wrong = 0; S.area = "tank";
-    await narrate(p.vo);
+    await Promise.all([narrate(p.vo), S.eqBuild && buildQuestionEq(q, p.vo)]);
+    S.eqBuild = false;
     setBanner(p.ost, "happy");
     focusOn("tank");
     S.countFrom = q.start;
@@ -1089,7 +1176,8 @@
     S.part = p; S.wrong = 0; S.area = "pad";
     showPlate();
     showPanel();
-    await narrate(p.vo);
+    await Promise.all([narrate(p.vo), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
+    S.eqBuild = false;
     S.entry = "";
     entryDisplay();
     setBanner(p.ost, "happy");
@@ -1202,9 +1290,9 @@
       setPlate(fmt(S.level));
     }
     const showOst = () => {
-      if (step.ostIn === "eq") { setMode("lvl"); showTeachEq(step.ost); }
+      if (step.ostIn === "eq") { setMode("lvl"); return showTeachEq(step.ost, { build: !!step.build }); }
     };
-    if (!step.ostAfter) showOst();
+    if (!step.ostAfter) await showOst();
     await Promise.all([narrate(step.vo, { speaker: step.speaker }), sayFx(step, showOst)]);
     if (!step.ostIn) setBanner(step.ost, "happy");
     await FX.sleep(500);
@@ -1217,12 +1305,18 @@
     await FX.sleep(400);
     switch (step.fx) {
       case "moveTo":                                     // "The lever moves …" (0 highlighted while crossing)
+        if (step.opGlow) {                               // "We add" / "We subtract": the sign lights up
+          await untilWord(step.vo, step.opGlow);
+          FX.flash(el.eqOp, "eqglow", 1800); FX.flash(el.eqOp, "eqpop", 500);
+        }
+        if (step.moveAt) await untilWord(step.vo, step.moveAt);
         await animateTo(step.to, 480, !!step.zeroGlow);
         setPlate(fmt(S.level), true);
         if (step.ostAfter) showOst();                    // "The equation completes."
         break;
       case "countSteps":                                 // "… levels highlight one by one."
-        await countPath(step.from, step.to);
+        if (step.build) await buildTeachEq(step);        // … and the equation is written along with the line
+        else await countPath(step.from, step.to);
         break;
       case "riseFall":                                   // "upward and downward arrow, plus and minus symbols"
         FX.flash(el.btnUp, "glow", 3000);
@@ -1276,20 +1370,6 @@
         FX.sfx("confetti");
         FX.confetti(el.confetti, { count: 160, x: 960, y: 420, power: 1.15, spread: 1.3 });
         break;
-      case "integers":                                   // "Full integer scale, highlighted negative numbers, 0, positive numbers"
-        setView(0);
-        await FX.sleep(500);
-        await glowDirection(0, -1, 700);
-        pulseLevel(0); S.labels[0].classList.add("lit");
-        await FX.sleep(1200);
-        S.labels[0].classList.remove("lit");
-        await glowDirection(0, 1, 700);
-        break;
-      case "sweepLever": {                               // "The lever moves briefly from a negative number through 0 to a positive number."
-        if (S.level >= 0) await animateTo(-2, 200);
-        await animateTo(Math.abs(S.level), 420, true);
-        break;
-      }
       case "badge":                                      // "completion badge"
         FX.flash(el.medal, "show", 3200);
         FX.sfx("board");
@@ -1360,7 +1440,7 @@
     if (step.camera && !REDUCED) {
       const c = step.camera;
       shot.style.transformOrigin = `${c.x}px ${c.y}px`;
-      shot.animate([{ transform: "scale(1)" }, { transform: `scale(${c.to})` }],
+      shot.animate([{ transform: `scale(${c.from || 1})` }, { transform: `scale(${c.to})` }],
         { duration: readMs + 1200, easing: "ease-in-out", fill: "forwards" });
     }
 
@@ -1380,7 +1460,17 @@
     // highlights on the scene art, one by one (+ the sign badge), while the line plays
     const lights = (async () => {
       await FX.sleep(400);
+      let lever = null;                              // sweep: a lever marker slides along the marks as they light
+      if (step.sweep && step.glow) {
+        lever = document.createElement("div");
+        lever.className = "lever";
+        lever.style.left = step.glow[0][0] - 120 + "px"; lever.style.top = step.glow[0][1] + "px";
+        spots.appendChild(lever);
+        void lever.offsetWidth; lever.classList.add("on");
+        await FX.sleep(400);
+      }
       for (const [x, y] of step.glow || []) {
+        if (lever) { lever.style.top = y + "px"; await FX.sleep(300); }
         const d = document.createElement("div");
         d.className = "spot" + (y > 600 ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
         spots.appendChild(d);
@@ -1399,7 +1489,7 @@
       }
     })();
 
-    await Promise.all([speak(step.vo), lights]);     // the line always plays to the end
+    await Promise.all([speak(step.vo), lights, step.fx ? sayFx(step) : null]);     // the line always plays to the end
     await FX.sleep(700);
     el.bubble.classList.remove("on");
     el.caption.classList.remove("on");
@@ -1424,6 +1514,28 @@
     el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
     FX.sfx("splashOut");
     await FX.sleep(300);
+  }
+
+  /** Game → story (Story End): the camera pulls back out of the tank into the scene. */
+  async function storyEnter(step) {
+    focusOn(null);
+    el.bubble.classList.remove("on"); el.caption.classList.remove("on");
+    const shot = el.shots[shotIdx];
+    shot.querySelector("img").src = `assets/story/scene-${step.scene}.jpg`;
+    shot.querySelector(".spots").innerHTML = "";
+    shot.style.transition = "none";
+    shot.classList.add("on");
+    el.shots[1 - shotIdx].classList.remove("on");
+    void shot.offsetWidth;
+    shot.style.transition = "";
+    el.story.classList.remove("hidden");
+    if (!REDUCED) {
+      shot.style.transformOrigin = "1040px 575px";                 // the tank in the scene art
+      shot.animate([{ transform: "scale(2.4)" }, { transform: "scale(1)" }], { duration: 1300, easing: "cubic-bezier(.1,.5,.3,1)" });
+      FX.sfx("splashOut");
+    }
+    await el.story.animate([{ opacity: 0 }, { opacity: 1 }], { duration: REDUCED ? 300 : 700, easing: "ease-out" }).finished;
+    await FX.sleep(REDUCED ? 0 : 600);
   }
 
   /* =================================================================
@@ -1565,6 +1677,7 @@
     let prev = null;
     for (const step of DATA.steps.slice(START_INDEX)) {
       if (prev && prev.section === "story" && step.section !== "story") await storyExit(step);   // story → game
+      else if (prev && prev.type !== "scene" && step.type === "scene") await storyEnter(step);   // game → story (Story End)
       else if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;

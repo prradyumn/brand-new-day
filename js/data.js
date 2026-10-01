@@ -1,6 +1,6 @@
 /* =====================================================================
    Integers: Rise and Fall — game script (content only, no logic)
-   Source: "Integers_Rise and Fall - Story n Game V3 (1).csv": the story
+   Source: "Integers_Rise and Fall - Story n Game V3.csv": the story
    (Intro, Teaching, Game start), How to Play, Level 1, Level 2 transition
    + game, Level 3 transition + game, Story End.
    Every line of text below is copied from the CSV (speaker labels and
@@ -43,6 +43,11 @@ window.GAME_DATA = {
        eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3)
        liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3
        autoLever        Level 3: the lever is off; it moves by itself after a correct answer
+                        (Level 2/3 equations build with the question's VO: the sign on
+                        "rises"/"goes up"/"goes down", the number on "3 levels", then "= ?")
+     Teaching rows (say): build { a, op, b } = the VO words where the start level, the sign
+                        and the counted number appear; opGlow / moveAt = the words where the
+                        sign lights up / the lever starts to move
        plateStart       what the display shows before the learner has entered anything
        wrong: null      the CSV has no incorrect feedback for this row (tutorials):
                         the attempt is shown (shake, ✗) but nothing is spoken
@@ -53,9 +58,12 @@ window.GAME_DATA = {
        bubble: { shape: "round" | "wide", tail: "left" | "right", w, tip: [x, y] }
                the bubble keeps its own proportions (never stretched); `tip` is where the
                tail points (the speaker), in stage px. caption: the narrator's line as on-screen text.
-       camera: a slow move { to: zoom, x, y } (the point the camera moves toward)
+       camera: a slow move { to: zoom, x, y } (the point the camera moves toward);
+               `from` starts zoomed in and pulls back (Story End: zoom out to the village)
        glow:   level marks on the scene art that light up one by one, [x, y] in scene px
-       sign:   a "+" / "−" badge (CSV visual assets "plus sign" / "minus sign")          */
+       sign:   a "+" / "−" badge (CSV visual assets "plus sign" / "minus sign")
+       sweep:  a lever marker slides along the glow marks as they light (Story End row 4)
+       fx:     "celebrate" (confetti) or "badge" (completion badge) while the line plays */
     { type: "scene", id: "ST1", section: "story", speaker: "narrator", scene: "p01", caption: true,
       camera: { to: 1.14, x: 580, y: 520 },                                // Wide view of the village. Camera moves towards the large water tank.
       vo: "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working.",
@@ -78,13 +86,13 @@ window.GAME_DATA = {
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 are highlighted one by one. Camera moves upward.
       glow: [[922, 481], [922, 396], [922, 308]],
       bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
-      vo: "Above 0, there is more water than requirement.",
+      vo: "Above 0, there is more water than required.",
       ost: "Above 0, there is more water than requirement." },
     { type: "scene", id: "ST6", section: "story", scene: "p08",
       camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 are highlighted one by one. Camera moves downward.
       glow: [[922, 650], [922, 743], [922, 842]],
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
-      vo: "Below 0, there is less water than requirement.",
+      vo: "Below 0, there is less water than required.",
       ost: "Below 0, there is less water than requirement." },
     { type: "scene", id: "ST7", section: "story", scene: "p07",
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 highlighted one by one, plus sign.
@@ -106,15 +114,15 @@ window.GAME_DATA = {
     { type: "scene", id: "ST10", section: "story", scene: "p04",
       glow: [[930, 553]],                                                  // Camera returns to the full tank and lever. The 0 mark glows.
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
-      vo: "Correct, Let’s mark the correct water level.",
-      ost: "Correct, Let’s mark the correct water level." },
+      vo: "Correct, Let’s mark the correct water level now.",
+      ost: "Correct, Let’s mark the correct water level now." },
 
     /* ======================= HOW TO PLAY (guided demo) ======================= */
     {
       type: "demo", id: "H1", section: "howto", guided: true, speaker: "narrator",
-      act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0
-      vo: "Move the lever up or down as shown.",
-      ost: "Move the lever up or down."
+      act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0. The "2 levels up" example is shown in H2 (+2 → +4)
+      vo: "Move the lever up or down as necessary. Like water rises 2 levels up.",
+      ost: "Move the lever up or down.\nMove the lever 2 levels up."
     },
     {
       type: "demo", id: "H2", section: "howto", guided: true,
@@ -224,18 +232,20 @@ window.GAME_DATA = {
       ost: "Water level goes down → Subtract" },
     { type: "say", id: "P3", section: "level2", level: 1, ostIn: "eq",
       fx: "countSteps", from: 1, to: 3,                                  // Lever starts at +1. Two levels above it highlight one by one.
+      build: { a: "+1", op: "rises", b: "2 levels" },                    // the equation is written with the line: 1 → + → 2 (counted 1, 2) → = ?
       vo: "Correct, Pari! If the water level is at +1 and rises by 2 levels, ",
       ost: "1 + 2 = ?" },
     { type: "say", id: "P4", section: "level2", level: 1, ostIn: "eq", ostAfter: true,
-      fx: "moveTo", to: 3,                                               // Lever moves +1 → +2 → +3. The equation completes.
+      fx: "moveTo", to: 3, opGlow: "add", moveAt: "new water level",     // Lever moves +1 → +2 → +3. The equation completes.
       vo: "We add and the new water level is +3.",
       ost: "1 + 2 = 3" },
     { type: "say", id: "P5", section: "level2", level: 3, ostIn: "eq",
       fx: "countSteps", from: 3, to: -2,                                 // Lever starts at +3. Five levels below it highlight one by one.
+      build: { a: "+3", op: "goes down", b: "5 levels" },
       vo: "Now, if the water level is at +3 and goes down by 5 levels.",
       ost: "3 − 5 = ?" },
     { type: "say", id: "P6", section: "level2", level: 3, ostIn: "eq", ostAfter: true,
-      fx: "moveTo", to: -2, zeroGlow: true,                              // +3 → … → −2, 0 highlighted while crossing.
+      fx: "moveTo", to: -2, zeroGlow: true, opGlow: "subtract", moveAt: "new water level",   // +3 → … → −2, 0 highlighted while crossing.
       vo: "We subtract and the new water level is −2.",
       ost: "3 − 5 = −2" },
     { type: "say", id: "P7", section: "level2", speaker: "pari", level: -2,
@@ -356,17 +366,30 @@ window.GAME_DATA = {
     { type: "say", id: "Z1", section: "end", fx: "displayGlow",                         // display lights up, sparkle
       vo: "Great work! You marked all the water levels correctly.",
       ost: "Great work! You marked all the water levels correctly." },
-    { type: "say", id: "Z2", section: "end", speaker: "pari", fx: "celebrate",          // confetti/sparkles
+    /* Z2–Z5 are full-screen story scenes again: the camera pulls back out of the tank
+       after Z1. p11 = celebration at the tank (water at −1, the last answer),
+       p12 = wide village view, both waving. Scale marks on p11: x ≈ 920,
+       +3 … −3 at y 310 / 400 / 482 / 553 / 653 / 743 / 842 (stage px). */
+    { type: "scene", id: "Z2", section: "end", speaker: "pari", scene: "p11", fx: "celebrate",   // Guddu Bhaiya and Pari look at the completed scale. Confetti/sparkles.
+      camera: { to: 1.04, x: 960, y: 560 },
+      bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
       vo: "We did it! We tracked every rise and fall in the water level.",
       ost: "We did it! We tracked every rise and fall in the water level." },
-    { type: "say", id: "Z3", section: "end", fx: "integers",                            // negatives, 0, positives highlighted
+    { type: "scene", id: "Z3", section: "end", scene: "p11",                                    // Camera focuses on the full scale: negative numbers, 0, positive numbers.
+      camera: { to: 1.08, x: 920, y: 575 },
+      glow: [[918, 653], [918, 743], [918, 842], [925, 553], [920, 482], [920, 400], [920, 310]],
+      bubble: { shape: "wide", tail: "right", w: 440, tip: [420, 300] },
       vo: "And these positive numbers, negative numbers, and 0 are called integers.",
       ost: "And these positive numbers, negative numbers, and 0 are called integers." },
-    { type: "say", id: "Z4", section: "end", speaker: "pari", fx: "sweepLever",         // lever: negative → 0 → positive
+    { type: "scene", id: "Z4", section: "end", speaker: "pari", scene: "p11", sweep: true,      // The lever moves briefly from a negative number through 0 to a positive number.
+      glow: [[918, 842], [918, 743], [918, 653], [925, 553], [920, 482], [920, 400], [920, 310]],
+      bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
       vo: "So integers helped us show water levels at 0, above 0, and below 0!",
       ost: "So integers helped us show water levels below 0, at 0, and above 0!" },
-    { type: "say", id: "Z5", section: "end", fx: "badge",                               // completion badge
-      vo: "Excellent! You’re a Water Level Expert now!",
+    { type: "scene", id: "Z5", section: "end", scene: "p12", fx: "badge",                       // Camera zooms out to the village and tank. Both wave. Completion badge.
+      camera: { from: 1.5, to: 1, x: 730, y: 310 },
+      bubble: { shape: "wide", tail: "left", w: 520, tip: [730, 310] },
+      vo: "Excellent! You’re an Integers Expert now!",
       ost: "Excellent! You’re a Water Level Expert now!" }
   ]
 };

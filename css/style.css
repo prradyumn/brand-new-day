@@ -77,11 +77,27 @@ button { font-family: inherit; cursor: pointer; }
   left: 270px; top: 433px; width: 507px; height: 146px;   /* same width and centre as the keys */
   border: 30px solid transparent;
   border-image: url(../assets/strip-cream.png) 90 fill / 30px stretch;
-  display: flex; align-items: center; justify-content: center; gap: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
   font-size: 46px; font-weight: 900; color: var(--navy); white-space: nowrap;
   z-index: 8;
 }
-#eqPanel > span { display: inline-block; transition: color .25s, text-shadow .25s; }
+#eqPanel > span {          /* each piece is its own card (reference mock): sizes in em so fitEq() shrinks the cards too */
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 1.55em; min-width: 1.5em; padding: 0 .28em; box-sizing: border-box;
+  border-radius: .3em; background: #fff;
+  box-shadow: inset 0 -.07em 0 rgba(19, 33, 63, .1), 0 .05em .12em rgba(19, 33, 63, .12);
+  transition: color .25s, text-shadow .25s, opacity .25s, transform .3s var(--ease-out);
+}
+#eqPanel > #eqOp, #eqPanel > #eqEq {   /* the signs: smaller, softer cards */
+  height: 1.2em; min-width: 1.2em; padding: 0 .1em;
+  background: #fff6dc; color: var(--navy-2);
+}
+#eqPanel > #eqAns {        /* the answer: light blue with a blue outline, as in the mock */
+  min-width: 2em; background: #e6f3ff;
+  box-shadow: inset 0 0 0 .07em var(--blue), 0 .05em .12em rgba(19, 33, 63, .12);
+}
+#eqPanel > span.eqhide { opacity: 0; transform: scale(.4); }   /* waiting for its word in the voice-over (keeps its space) */
+#eqPanel > span.eqpop { animation: eqPop .5s var(--ease-spring); }
 #eqAns { color: var(--blue); }
 #eqPanel .gone { display: none; }
 #eqPanel.appear { animation: panelIn .8s var(--ease-spring); }
@@ -450,7 +466,7 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes handTapFlip { 50% { transform: translate(-62%, -94%) rotate(180deg) scale(.82); } }
 
 /* ---------------- FX ---------------- */
-#fxLayer { inset: 0; width: 1920px; height: 1080px; z-index: 60; pointer-events: none; }
+#fxLayer { inset: 0; width: 1920px; height: 1080px; z-index: 72; pointer-events: none; }   /* sparkles, badges, medal and confetti sit above #story (70) for the Story End scenes */
 .spark {
   position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px;
   background: radial-gradient(circle, #fff 0 25%, #ffe34d 40%, rgba(255,200,0,0) 70%);
@@ -484,7 +500,7 @@ button { font-family: inherit; cursor: pointer; }
 #markedBadge.show { animation: markedIn 2.2s var(--ease-spring) forwards; }
 /* Story end: completion badge */
 #medal {
-  left: 810px; top: 320px; width: 300px; height: 300px; z-index: 61; pointer-events: none;
+  left: 810px; top: 320px; width: 300px; height: 300px; z-index: 73; pointer-events: none;
   border-radius: 50%; display: grid; place-items: center;
   background: radial-gradient(circle at 35% 30%, #fff6b0, #ffd21a 45%, #e89b00 100%);
   border: 14px solid #fff; box-shadow: 0 0 0 10px #ff9a1f, 0 20px 50px rgba(0,0,0,.35), 0 0 60px rgba(255, 210, 0, .8);
@@ -492,7 +508,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 #medal span { color: #fff; font-size: 170px; line-height: 1; text-shadow: 0 6px 0 rgba(170, 90, 0, .55); }
 #medal.show { animation: markedIn 3.1s var(--ease-spring) forwards; }
-#confetti { left: 0; top: 0; width: 1920px; height: 1080px; z-index: 62; pointer-events: none; }
+#confetti { left: 0; top: 0; width: 1920px; height: 1080px; z-index: 74; pointer-events: none; }
 
 .shake { animation: shake .45s ease; }
 
@@ -546,6 +562,17 @@ button { font-family: inherit; cursor: pointer; }
 #story .sign.plus { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5b400 60%, #d68f00); }
 #story .sign.minus { background: radial-gradient(circle at 35% 30%, #8fd0ff, #2b8cf2 60%, #1466d4); }
 #story .sign.on { opacity: 1; transform: scale(1); }
+#story .lever {                      /* Story End row 4: a lever marker that slides along the scale */
+  position: absolute; width: 120px; height: 46px; margin: -23px 0 0 -60px;
+  filter: drop-shadow(0 0 10px rgba(255, 210, 40, .9)) drop-shadow(0 4px 4px rgba(0, 0, 0, .25));
+  opacity: 0; transition: top .45s var(--ease-out), opacity .3s;
+}
+#story .lever::before {              /* the arrow shape (clipped here so the glow on the parent isn't) */
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, #fff1a0, #ffd21a 45%, #f0a800);
+  clip-path: polygon(0 28%, 60% 28%, 60% 0, 100% 50%, 60% 100%, 60% 72%, 0 72%);
+}
+#story .lever.on { opacity: 1; }
 #story .sign span { transform: translateY(-6px); }
 
 /* Speech bubble: the artwork keeps its own proportions (width set, height from the image);
@@ -690,6 +717,11 @@ button { font-family: inherit; cursor: pointer; }
   25% { transform: scale(1.15); opacity: 1; }
   75% { transform: scale(1); opacity: 1; }
   100% { transform: scale(.85); opacity: 0; }
+}
+@keyframes eqPop {
+  0% { transform: scale(.4); }
+  55% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 @keyframes markedIn {
   0% { opacity: 0; transform: scale(.4) translateY(-30px); }

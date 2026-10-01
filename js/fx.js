@@ -52,6 +52,16 @@
   /** Reading-time estimate used when muted / no voice (ms). */
   FX.readTime = (text) => Math.max(1600, text.length * 55 + 900);
 
+  /* How far the current line has got, 0…1, so the game can time an animation to a
+     word (game.js untilWord). Recorded clip: its playhead. Browser voice or muted:
+     the time since the line began, against its reading time. */
+  let line = null, lastLine = null;               // line: { text, t0, ms, clip }
+  FX.progress = (text) => {
+    if (!line || line.text !== text) return lastLine === text ? 1 : 0;
+    if (line.clip) return voEl.duration ? voEl.currentTime / voEl.duration : 0;
+    return Math.min(1, (performance.now() - line.t0) / line.ms);
+  };
+
   /* The voice only plays while the game is on screen. When the tab is hidden
      or the window loses focus, the current line is cut off and the game waits;
      when the learner comes back, that line starts again from the beginning. */
@@ -103,15 +113,22 @@
     return new Promise((resolve) => {
       const t0 = performance.now();
       let done = false, timer = null, poll = null, muting = false, clipOn = false;
+      line = { text, t0, ms: FX.readTime(text), clip: false };
+      if (lastLine === text) lastLine = null;
       const stopClip = () => {
         if (!clipOn) return;
         clipOn = false;
+        if (line && line.text === text) {               // carry on from the same point on the timer (muted mid-line)
+          const f = voEl.duration ? voEl.currentTime / voEl.duration : 0;
+          Object.assign(line, { clip: false, t0: performance.now() - f * line.ms });
+        }
         voEl.onended = voEl.onerror = voEl.onplaying = null;
         voEl.pause();
       };
       const finish = (cut) => {
         if (done) return;
         done = true;
+        if (line && line.text === text) { line = null; if (!cut) lastLine = text; }
         clearTimeout(timer);
         clearInterval(poll);
         stopClip();
@@ -142,6 +159,7 @@
       const clip = FX.clipFor(text, opts.speaker);
       if (clip) {
         clipOn = true;
+        line.clip = true;
         let started = false;
         const toSynth = (why) => {                       // clip missing / blocked: the browser voice reads it
           if (done || muting || !clipOn) return;
@@ -169,18 +187,20 @@
       /* ---- Browser voice ---- */
       function startSynth() {
         if (!synth) { readFallback(); return; }
-        /* The line counts as done only when the speech engine has really finished
-           it. No fixed timer can cut a slow voice short:
+        /* The line counts as done when the speech engine has finished it:
              - `onend` is the normal signal;
              - polling `speaking` catches engines that drop `onend` (Chrome);
-             - if speech never starts, the text gets its reading time and a notice appears;
-             - a very generous cap only guards against a stuck engine. */
+             - the line has started only when `onstart` fires. Chrome can report
+               `speaking` while no sound comes out and never end the line, so
+               `speaking` alone doesn't count: without `onstart` the text gets its
+               reading time, a notice appears, and the game carries on;
+             - a cap of 1.5× the reading time guards against an engine that hangs mid-line. */
         let started = false, quiet = 0;
         const markStarted = () => {
           if (started || done) return;
           started = true;
           clearTimeout(timer);
-          timer = setTimeout(finish, FX.readTime(text) * 3 + 10000);
+          timer = setTimeout(finish, FX.readTime(text) * 1.5 + 2500);
         };
         clearTimeout(timer);
         timer = setTimeout(() => {
@@ -210,7 +230,7 @@
             };
             synth.speak(u);
             poll = setInterval(() => {
-              if (synth.speaking) { markStarted(); quiet = 0; return; }
+              if (synth.speaking) { quiet = 0; return; }
               if (started && !synth.pending && ++quiet >= 3) finish();
             }, 250);
           } catch (e) {
