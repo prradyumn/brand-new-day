@@ -6,7 +6,7 @@
   <title>Integers: Rise and Fall</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -37,7 +37,7 @@
         </div>
         <div id="padActions">
           <button id="btnClear" class="pad-btn pad-btn--clear" aria-label="Clear">⌫</button>
-          <button id="btnCheck" class="pad-btn pad-btn--check">Check</button>
+          <button id="btnCheck" class="pad-btn pad-btn--check" data-i18n="check">Check</button>
         </div>
       </div>
       <div id="plate" class="hidden"><span id="plateText">0</span></div>
@@ -153,6 +153,7 @@
       </div>
 
       <!-- ============ HUD ============ -->
+      <button id="btnLang" class="hud-btn" data-i18n="langBtn">हिंदी</button>   <!-- language: reloads at the same step (js/lang.js) -->
       <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
       <button id="btnJump" class="hud-btn hidden" aria-label="QA level jumper">⏭</button>
       <div id="progress"></div>
@@ -175,14 +176,14 @@
 
       <div id="startScreen" class="screen">
         <div class="card">
-          <h1>Integers<br /><span>Rise and Fall</span></h1>
+          <h1 data-i18n="title">Integers<br /><span>Rise and Fall</span></h1>
           <div id="qaStartTag" class="hidden"></div>
           <button id="btnStart" class="big-btn" aria-label="Play">▶</button>
         </div>
       </div>
       <div id="endScreen" class="screen hidden">
         <div class="card">
-          <h1>Integers<br /><span>Rise and Fall</span></h1>
+          <h1 data-i18n="title">Integers<br /><span>Rise and Fall</span></h1>
           <button id="btnReplay" class="big-btn" aria-label="Play again">↻</button>
         </div>
       </div>
@@ -194,6 +195,8 @@
   <div id="under" class="hidden" aria-hidden="true"><div class="rays"></div><div class="bubbles"></div></div>
 
   <script src="js/data.js"></script>
+  <script src="js/lang-hi.js"></script>  <!-- Hindi lines -->
+  <script src="js/lang.js"></script>     <!-- English / Hindi: swaps the lines before the game starts -->
   <script src="assets/vo/manifest.js"></script>  <!-- recorded voice-over clips (tools/generate-audio.mjs) -->
   <script src="assets/vo/lipsync.js"></script>   <!-- how loud each clip is, for the mouths (tools/make-lipsync.mjs) -->
   <script src="js/fx.js"></script>

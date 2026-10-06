@@ -2,7 +2,8 @@
 /* =====================================================================
    generate-audio.mjs — pre-records the game's audio with the Gemini API.
 
-     • Voice-over: every line in js/data.js → assets/vo/*.mp3 (Gemini TTS),
+     • Voice-over: every line in js/data.js, in English and in Hindi (js/lang-hi.js,
+       through js/lang.js) → assets/vo/*.mp3 (Gemini TTS),
        plus assets/vo/manifest.js, which fx.js uses to play the clips.
        Each clip is transcribed and compared with the script; a clip that
        doesn't match word for word is generated again.
@@ -46,6 +47,19 @@ const NOTES = [
   "Pacing: natural and clear, no long pauses."
 ].join("\n");
 
+/* Hindi: the same voices, cast for natural, everyday Hindi */
+const VOICES_HI = {
+  guddu:    "Guddu Bhaiya, a cheerful young Indian man in his twenties from a village in Uttar Pradesh, the kind older brother of the neighbourhood, speaking warm, natural, everyday Hindi",
+  pari:     "Pari, a curious and excited eight-year-old Indian girl from a village in Uttar Pradesh, speaking natural Hindi with a bright, young child's voice",
+  narrator: "An Indian storyteller narrator, calm and warm, speaking clear, natural Hindi"
+};
+const NOTES_HI = [
+  "Language: natural, everyday spoken Hindi (Hindustani), exactly as a Hindi speaker from Uttar Pradesh or Delhi talks. Pure Hindi pronunciation, never an English accent.",
+  "Read the transcript exactly as written, word for word, in Hindi. Read the numbers in Hindi (2 = दो, 5 = पाँच). 'धन' and 'ऋण' are maths words (positive / negative): say them clearly.",
+  "Style: warm, friendly and encouraging, for young children in primary school.",
+  "Pacing: natural and clear, a little slower than adult conversation, no long pauses."
+].join("\n");
+
 const MUSIC_PROMPT = "Soothing, gentle instrumental background music for a children's educational maths game set in a sunny Indian village beside a big water tank. Soft bansuri flute melody, light marimba, warm fingerpicked acoustic guitar, very soft hand percussion (light tabla), calm, cheerful and encouraging, about 80 BPM, major key. No vocals. Even, low-key texture that sits quietly under narration and loops smoothly, with no sudden drops, builds or loud hits.";
 
 /* ---------------------------------------------------------------------
@@ -53,11 +67,14 @@ const MUSIC_PROMPT = "Soothing, gentle instrumental background music for a child
    speaker it uses (game.js: narrate → step.speaker; feedback → guddu).
    --------------------------------------------------------------------- */
 function loadLines() {
-  const sandbox = { window: {} };
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, "js/data.js"), "utf8"), sandbox);
+  const sandbox = { window: {}, console: { warn() {}, log() {} } };
+  vm.createContext(sandbox);
+  for (const f of ["js/data.js", "js/lang-hi.js", "js/lang.js"]) vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), sandbox);
+  const W = sandbox.window;
   const lines = new Map();
-  const add = (speaker, text) => { if (text) lines.set(`${speaker}|${text}`, { speaker, text }); };
-  for (const s of sandbox.window.GAME_DATA.steps) {
+  const addAll = (data, lang) => {
+  const add = (speaker, text) => { if (text) lines.set(`${speaker}|${text}`, { speaker, text, lang }); };
+  for (const s of data.steps) {
     const who = s.speaker || "guddu";
     add(who, s.vo);                                   // demo / say / gate
     if (s.idle) add("guddu", s.idle.text);            // gate inactivity
@@ -68,11 +85,17 @@ function loadLines() {
       if (p.idle) add("guddu", p.idle.text);
     }
   }
+  };
+  addAll(W.GAME_DATA, "en");
+  addAll(W.I18N.translateGame(JSON.parse(JSON.stringify(W.GAME_DATA)), W.LANG_HI), "hi");   // the Hindi lines (js/lang-hi.js)
+  W.LANG_HI.spoken && (spokenHi = W.LANG_HI.spoken);
   return [...lines.values()];
 }
+let spokenHi = null;
 
-/** What the voice reads: signs and 0 written out, line breaks joined. */
-function spokenForm(text) {
+/** What the voice reads: signs and 0 written out, line breaks joined (Hindi: "धन 2", "ऋण 3", "शून्य"). */
+function spokenForm(text, lang) {
+  if (lang === "hi") return spokenHi(text);
   return text
     .replace(/\s*\n\s*/g, " ")
     .replace(/−(\d)/g, "minus $1")
@@ -100,25 +123,29 @@ async function call(model, body, tries = 6) {
 }
 const audioPart = (d) => d.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
 
-function ttsPrompt(speaker, text) {
-  return `# AUDIO PROFILE: ${VOICES[speaker].profile}\n\n## THE SCENE\n${SCENE}\n\n### DIRECTOR'S NOTES\n${NOTES}\n\n#### TRANSCRIPT\n${text}`;
+function ttsPrompt(speaker, text, lang) {
+  const profile = lang === "hi" ? VOICES_HI[speaker] : VOICES[speaker].profile;
+  return `# AUDIO PROFILE: ${profile}\n\n## THE SCENE\n${SCENE}\n\n### DIRECTOR'S NOTES\n${lang === "hi" ? NOTES_HI : NOTES}\n\n#### TRANSCRIPT\n${text}`;
 }
-async function tts(speaker, text) {
+async function tts(speaker, text, lang) {
   const d = await call(TTS_MODEL, {
-    contents: [{ parts: [{ text: ttsPrompt(speaker, text) }] }],
+    contents: [{ parts: [{ text: ttsPrompt(speaker, text, lang) }] }],
     generationConfig: {
       responseModalities: ["AUDIO"],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[speaker].voice } }, languageCode: LANGUAGE }
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[speaker].voice } }, languageCode: lang === "hi" ? "hi-IN" : LANGUAGE }
     }
   });
   const a = audioPart(d);
   if (!a) throw new Error("no audio returned");
   return { buf: Buffer.from(a.data, "base64"), mime: a.mimeType };
 }
-async function transcribe(audio, mime = "audio/wav") {
+async function transcribe(audio, mime = "audio/wav", lang = "en") {
+  const ask = lang === "hi"
+    ? "Write out every word spoken in this Hindi audio, verbatim, in Devanagari script, from the first sound to the last. Write numbers as Hindi words (दो, पाँच). Do not translate, skip or summarise anything. Output only the words."
+    : "Write out every word spoken in this audio, verbatim, from the first sound to the last. Do not skip or summarise anything. Output only the words.";
   const d = await call(CHECK_MODEL, { contents: [{ parts: [
     { inlineData: { mimeType: mime, data: audio.toString("base64") } },
-    { text: "Write out every word spoken in this audio, verbatim, from the first sound to the last. Do not skip or summarise anything. Output only the words." }
+    { text: ask }
   ] }] });
   return d.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join(" ").trim() || "";
 }
@@ -128,8 +155,16 @@ const NUM = { 0: "zero", 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6
 const words = (t) => t.toLowerCase().replace(/’/g, "'").replace(/[−-](\d)/g, "minus $1").replace(/\+(\d)/g, "plus $1").replace(/\b(\d+)\b/g, (m) => NUM[m] || m)
   .replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean)
   .map((w) => w.replace(/'s$/, "s").replace(/'/g, ""));
-function matches(expected, heard) {
-  const a = words(expected), b = words(heard);
+/* Hindi: Devanagari words, numbers as Hindi words, spelling variants folded together
+   (ँ/ं, nukta, पाँच/पांच, छह/छः) so only real differences count. */
+const NUM_HI = ["शून्य", "एक", "दो", "तीन", "चार", "पांच", "छह", "सात", "आठ", "नौ", "दस"];
+const wordsHi = (t) => t.normalize("NFC")
+  .replace(/\b(\d+)\b/g, (m) => NUM_HI[+m] || m)
+  .replace(/\u0901/g, "\u0902").replace(/\u093C/g, "").replace(/छः|छे/g, "छह")
+  .replace(/[^\u0900-\u0963\u0966-\u097F\s]+/g, " ").replace(/[।॥]/g, " ")
+  .split(/\s+/).filter(Boolean);
+function matches(expected, heard, lang = "en") {
+  const a = lang === "hi" ? wordsHi(expected) : words(expected), b = lang === "hi" ? wordsHi(heard) : words(heard);
   // longest common subsequence
   const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
   for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
@@ -137,6 +172,8 @@ function matches(expected, heard) {
   const lcs = dp[a.length][b.length];
   const missing = a.length - lcs, extra = b.length - lcs;
   // no added words at all (the voice sometimes ad-libs "Haha," or "no?"); one dropped word allowed in long lines
+  if (lang === "hi")   // the transcriber splits / joins some Hindi words differently: allow a little either way
+    return { ok: a.length > 0 && missing <= Math.max(1, Math.floor(a.length * .12)) && extra <= 1, missing, extra };
   return { ok: missing <= (a.length > 8 ? 1 : 0) && extra === 0, missing, extra };
 }
 
@@ -173,10 +210,10 @@ async function makeVoice() {
     const key = `${l.speaker}|${l.text}`;
     const file = `assets/vo/${l.speaker}-${crypto.createHash("sha1").update(key).digest("hex").slice(0, 10)}.mp3`;
     const out = path.join(ROOT, file);
-    const spoken = spokenForm(l.text);
+    const spoken = spokenForm(l.text, l.lang);
     if (fs.existsSync(out) && !ARGS.has("--force")) {
       // --verify: listen to the existing clip again and re-record it if it doesn't match the script
-      if (!ARGS.has("--verify") || matches(spoken, await transcribe(fs.readFileSync(out), "audio/mpeg")).ok) {
+      if (!ARGS.has("--verify") || matches(spoken, await transcribe(fs.readFileSync(out), "audio/mpeg", l.lang), l.lang).ok) {
         manifest[key] = file; done++;
         process.stdout.write(`\r  voice-over ${done}/${lines.length}   `);
         return;
@@ -186,10 +223,10 @@ async function makeVoice() {
     let last = "";
     for (let attempt = 1; attempt <= 4; attempt++) {
       try {
-        const { buf, mime } = await tts(l.speaker, spoken);
+        const { buf, mime } = await tts(l.speaker, spoken, l.lang);
         const wav = toWav(buf, mime);
-        const heard = await transcribe(wav);
-        const m = matches(spoken, heard);
+        const heard = await transcribe(wav, "audio/wav", l.lang);
+        const m = matches(spoken, heard, l.lang);
         if (!m.ok) { last = heard; continue; }                          // ad-libbed or cut: record again
         voiceMp3(wav, out);
         manifest[key] = file; made++;

@@ -268,7 +268,7 @@
   FX.speak = async (text, opts = {}) => {
     const my = ++gen;
     // Screen-reader friendly symbols (browser voice only; clips are recorded from the same line)
-    const spoken = text
+    const spoken = window.LANG === "hi" && window.LANG_HI ? window.LANG_HI.spoken(text) : text   // Hindi: "ऋण 3", "धन 2"
       .replace(/−/g, "minus ")
       .replace(/\+(\d)/g, "plus $1")
       .replace(/\(|\)/g, "")

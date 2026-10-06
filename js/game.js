@@ -900,10 +900,12 @@
   /** Level 2/3 question: the start level is up with the question, then the sign
       on "rises" / "goes up" / "goes down", the number on "3 levels", then "= ?". */
   async function buildQuestionEq(q, vo) {
-    const dir = /rises|goes up|goes down/.exec(vo);
+    const cues = DATA.cues || { dir: "rises|goes up|goes down", levels: "{n} levels" };   // Hindi: js/lang-hi.js
+    const dir = cues.dir && new RegExp(cues.dir).exec(vo);
     if (dir) await untilWord(vo, dir[0]);
-    eqShow(el.eqOp);
-    await untilWord(vo, `${Math.abs(q.eq.b)} levels`);
+    if (cues.dir) eqShow(el.eqOp);
+    await untilWord(vo, cues.levels.replace("{n}", Math.abs(q.eq.b)));
+    if (!cues.dir) eqShow(el.eqOp);                      // Hindi says the number first: the sign comes with it
     eqShow(el.eqB);
     await FX.sleep(450);
     eqShow(el.eqEq, el.eqAns);
@@ -1891,6 +1893,7 @@
       else if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;
+      S.stepId = step.id;                                 // the language button reloads at this step
       if (step.type === "question") await runQuestion(step, { flip });
       else if (step.type === "gate") await runGate(step);
       else if (step.type === "demo") await runDemo(step);

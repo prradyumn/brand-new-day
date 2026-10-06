@@ -2,7 +2,7 @@
 
 This is a plain HTML, CSS and JavaScript game with no build step and no libraries. It follows **"Integers_Rise and Fall - Story n Game V3.csv"** from the "How to Play" table onward: How to Play, Level 1, the Level 2 transition and game, the Level 3 transition and game, and the Story End. The intro/teaching story rows before "How to Play" are not part of the game. The layout matches **Figma → Integers → page "LBD" → Section 2** (Slide 16:9 – 16 / 18 / 19 / 20).
 
-**Content rule:** every spoken line and every piece of on-screen text comes from the CSV. `data.js` copies it verbatim, with speaker labels ("Guddu Bhaiya:") and quote marks removed. The engine adds no dialogue or captions of its own. Buttons use the CSV's "Start" or icons (▶ ↻ ⏸).
+**Content rule:** every spoken line and every piece of on-screen text comes from the CSV (in Hindi: from its translation in `js/lang-hi.js`). `data.js` copies it verbatim, with speaker labels ("Guddu Bhaiya:") and quote marks removed. The engine adds no dialogue or captions of its own. Buttons use the CSV's "Start" or icons (▶ ↻ ⏸).
 
 ---
 
@@ -39,6 +39,20 @@ brand-new-day/        (repo root)
 **Deploy (Vercel):** static site, no build step. Framework preset "Other", Root Directory empty (the repo root), no build or output command.
 
 Script load order matters: `data.js` → `assets/vo/manifest.js` → `fx.js` → `game.js`.
+
+## 2a. Languages: English and Hindi
+
+* **Choosing:** the हिंदी / English button (top right, `#btnLang`) switches language. It reloads the game at the same step (`?lang=hi&step=ID`, then press ▶, because browsers only allow speech after a tap). The choice is remembered (localStorage), and `?lang=en|hi` also works in a link.
+* **How it works:** `js/lang.js` runs before the game. For Hindi it swaps every line of `GAME_DATA` (VO, OST, correct and wrong lines, idle prompts, buttons, `ui`) for its Hindi line from `js/lang-hi.js`, so `game.js` runs exactly the same. The page's own text (title, Check) uses `data-i18n`. The equation cue words are per language too (`cues`, and `steps` for P3–P6).
+* **`js/lang-hi.js`:** `exact` holds the one-off lines and `patterns` the lines that differ only by their numbers. Equations ("(+4) + 3 = ?") stay as they are. A line with no translation is logged as `[lang] no translation for: …` and shows in English: add it to `lang-hi.js`. The current script translates completely.
+* **Hindi teaching choices** (the header of `lang-hi.js` has the full list):
+  * Maths words as Hindi-medium textbooks use them: पूर्णांक, धनात्मक / ऋणात्मक संख्याएँ.
+  * The voice reads +2 as "धन 2", −3 as "ऋण 3" and 0 as "शून्य". The screen keeps + − 0.
+  * The words pair up: बढ़ता है → जोड़ते हैं, घटता है → घटाते हैं.
+  * The game's levels are "लेवल" and the water's level is "स्तर", so the two are never confused.
+  * The learner is "तुम", with gender-neutral sentences.
+* **Hindi voice:** recorded by `tools/generate-audio.mjs` together with English, using the same voices cast for natural Uttar Pradesh / Delhi Hindi (`VOICES_HI`, `NOTES_HI`, language `hi-IN`). Each take is transcribed in Devanagari and compared word by word, with spelling variants folded together. The manifest holds both languages, keyed by the line itself.
+* **Font:** Devanagari uses Baloo 2 (Google Fonts, after Nunito in the font stack).
 
 ## 3. Coordinate system
 
