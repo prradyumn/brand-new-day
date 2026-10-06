@@ -3,9 +3,9 @@
 
    Flow (see CONTEXT.md for the full walkthrough):
      Start → How to Play [H1…H5, guided demo]
-           → Level 1 [L1T tutorial, TR1, Q1…Q7]
+           → Level 1 [L1T tutorial, TR1, Q1…Q6]
            → Level 2 [teaching P1…P7, TR2, A0 tutorial, A1…A6, E2 Level Complete]
-           → Level 3 [S0, R2…R6, B0 tutorial, B1…B6 keypad only]
+           → Level 3 [S0, R2…R6, B1…B7 keypad only]
            → Story End [Z1…Z5] → End screen
 
    Blur/spotlight: How to Play and the Level 1 tutorial (`guided`). From TR1
@@ -34,6 +34,7 @@
   const WATER_BOTTOM = 963;    // inner glass bottom
   const MARKER_H = 40;
   const LABEL_X = 1329;        // centre of the level labels (for sparkles)
+  const STREAM_TOP = 70;       // #streamIn top: just inside the inlet pipe's mouth
 
   /* Spotlight holes for the focus layer */
   // Holes must never overlap: under evenodd an overlap cancels out and shows as blur.
@@ -49,9 +50,27 @@
 
   /* Who is speaking: banner avatar, full-size art (guided steps) and voice pitch */
   const SPEAKERS = {
-    guddu:    { full: "assets/guddu-full.png", pitch: 1.0 },
-    pari:     { full: "assets/pari-full.png",  pitch: 1.35 },
-    narrator: { full: null,                    pitch: 1.05 }
+    guddu:    { full: true,  pitch: 1.0 },       // full: slides in full size in guided steps (POSES)
+    pari:     { full: false, pitch: 1.35 },
+    narrator: { full: false, pitch: 1.05 }
+  };
+
+  /* Talking characters: frame strips where every frame is the same picture except the
+     mouth (or the eyes, for a blink). `mouth` = the frame for closed / half / wide open
+     (two-frame sets: closed / open); `blink` = the eyes-shut frame. lipLoop() picks the
+     frame from the voice (FX.mouth). */
+  const AVATARS = {
+    "guddu-happy": { src: "assets/char/avatar-guddu-happy.png", frames: 4, mouth: [0, 1, 2], blink: 3 },
+    "guddu-sad":   { src: "assets/char/avatar-guddu-sad.png",   frames: 2, mouth: [0, 1, 1] },
+    "guddu-think": { src: "assets/char/avatar-guddu-think.png", frames: 2, mouth: [0, 1, 1] },
+    "pari-happy":  { src: "assets/char/avatar-pari-happy.png",  frames: 4, mouth: [0, 1, 2], blink: 3 }
+  };
+  const POSES = {                                // full-size Guddu (data.js `pose`), feet on the same spot in every strip
+    // tip / tipRight: where the speech bubble's tail points (beside his head, stage px) when
+    // he stands on the left (over the keypad) / on the right (over the tank, mirrored)
+    talk:   { src: "assets/char/guddu-talk.png",   frames: 3, mouth: [0, 1, 2], tip: [352, 352], tipRight: [1252, 352] },
+    point:  { src: "assets/char/guddu-point.png",  frames: 2, mouth: [0, 1, 1], tip: [446, 352], tipRight: [1172, 344] },
+    thumbs: { src: "assets/char/guddu-thumbs.png", frames: 2, mouth: [0, 1, 1], tip: [318, 346], tipRight: [1290, 346] }
   };
 
   /* ---------------- DOM ---------------- */
@@ -62,15 +81,16 @@
     panel: $("panel"),
     eqPanel: $("eqPanel"), eqA: $("eqA"), eqOp: $("eqOp"), eqB: $("eqB"), eqEq: $("eqEq"), eqAns: $("eqAns"),
     btnCheck: $("btnCheck"), btnClear: $("btnClear"),
-    water: $("water"), pipeIn: $("pipeIn"), pipeOut: $("pipeOut"),
+    water: $("water"), streamIn: $("streamIn"), splashIn: $("splashIn"), streamOut: $("streamOut"),
     strip: $("scaleStrip"), countLine: $("countLine"),
     marker: $("marker"), btnUp: $("btnUp"), btnDown: $("btnDown"),
     fx: $("fxLayer"), confetti: $("confetti"), marked: $("markedBadge"), medal: $("medal"),
     gateBtn: $("gateBtn"), progress: $("progress"), paused: $("paused"),
     btnMute: $("btnMute"), startScreen: $("startScreen"), endScreen: $("endScreen"), hand: $("hand"),
-    under: $("under"),
+    under: $("under"), flood: $("flood"),
     story: $("story"), shots: [...document.querySelectorAll("#story .shot")], caption: $("caption"),
-    bubble: $("bubble"), bubbleImg: document.querySelector("#bubble img"), bubbleText: $("bubbleText")
+    bubble: $("bubble"), hostBubble: $("hostBubble"),
+    charArt: document.querySelector("#character .art"), charGlow: $("charGlow")
   };
 
   /* ---------------- State ---------------- */
@@ -182,14 +202,13 @@
     }
   }
 
-  function buildBubbles() {
-    const box = el.water.querySelector(".bubbles");
-    for (let i = 0; i < 12; i++) {
+  function buildBubbles(box = el.water.querySelector(".bubbles"), n = 12, w = 340) {
+    for (let i = 0; i < n; i++) {
       const b = document.createElement("span");
       b.className = "bubble";
       const size = 8 + Math.random() * 18;
       b.style.width = b.style.height = size + "px";
-      b.style.left = 20 + Math.random() * 340 + "px";
+      b.style.left = 20 + Math.random() * w + "px";
       b.style.animationDuration = 5 + Math.random() * 6 + "s";
       b.style.animationDelay = -Math.random() * 8 + "s";
       box.appendChild(b);
@@ -223,6 +242,8 @@
     const top = Math.max(WATER_TOP_MIN, Math.min(WATER_BOTTOM - 4, wy));
     el.water.style.top = top + "px";
     el.water.style.height = WATER_BOTTOM - top + "px";
+    el.streamIn.style.height = top - STREAM_TOP + 6 + "px";             // the inlet stream reaches the water surface
+    el.splashIn.style.top = top - 6 + "px";
     for (const k in S.labels) {
       const cur = +k === S.level;
       S.labels[k].classList.toggle("current", cur);
@@ -269,12 +290,24 @@
     if (instant) { void el.water.offsetWidth; el.water.classList.remove("instant"); }
   }
 
+  /** Water pours from the inlet (filling) or out of the outlet (draining) while the
+      level moves, and stops 0.9 s after the last step. The pipes themselves never change. */
   function flowPipe(which) {
-    const img = which === "in" ? el.pipeIn : el.pipeOut;
+    const stream = which === "in" ? el.streamIn : el.streamOut;
     const key = which === "in" ? "pipeIn" : "pipeOut";
-    img.src = `assets/pipe-${which}-water.png`;
+    if (!stream.classList.contains("on")) {
+      stream.classList.add("reset");                 // a stream that was stopping goes back to the pipe at once
+      stream.classList.remove("off");
+      void stream.getBoundingClientRect();
+      stream.classList.remove("reset");
+      stream.classList.add("on");                    // … and pours again
+      if (which === "in") el.splashIn.classList.add("on");
+    }
     clearTimeout(S.timers[key]);
-    S.timers[key] = setTimeout(() => { img.src = `assets/pipe-${which}-dry.png`; }, 900);
+    S.timers[key] = setTimeout(() => {
+      stream.classList.replace("on", "off");         // the tail drops away
+      if (which === "in") el.splashIn.classList.remove("on");
+    }, 900);
   }
 
   /** Move the marker one level at a time. `zeroGlow`: 0 lights up as it is crossed. */
@@ -337,7 +370,9 @@
     const pad = open.pad || shut(S.padHole || HOLES.padTut);
     // ▲ / ▼ poke out left of the tank spotlight: raise them above the glass so they stay sharp and pressable
     el.stage.classList.toggle("lever-lit", !!open.tank);
-    el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(HOLES.narr)} ${rr(tank)} ${rr(pad)}")`;
+    const host = el.stage.classList.contains("host");      // Guddu's line is in his bubble: the narrator box is away
+    const narr = host ? shut(HOLES.narr) : HOLES.narr;
+    el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(narr)} ${rr(tank)} ${rr(pad)}")`;
     el.focus.style.webkitClipPath = el.focus.style.clipPath;
     el.focus.classList.add("on");
     const was = S.focusOpen || {};
@@ -345,7 +380,7 @@
     if (open.tank && !was.tank) FX.flash(el.ring1, "sweep", 1700);
     if (open.pad && was.pad !== open.pad) FX.flash(el.ring2, "sweep", 1700);
     S.focusKey = key; S.focusOpen = open;
-    placeRing(el.ring0, HOLES.narr, true);
+    placeRing(el.ring0, narr, !host);
     placeRing(el.ring1, tank, !!open.tank);
     placeRing(el.ring2, pad, !!open.pad);
   }
@@ -360,11 +395,47 @@
     const who = S.speaker;
     el.avatar.classList.toggle("none", who === "narrator");
     if (who === "narrator") return;
-    const src = who === "pari" ? "assets/pari-happy.png" : `assets/guddu-${mood || "happy"}.png`;
-    if (!el.avatar.src.endsWith(src)) {
-      el.avatar.src = src;
+    const set = AVATARS[who === "pari" ? "pari-happy" : `guddu-${mood || "happy"}`] || AVATARS["guddu-happy"];
+    if (el.avatar.sprite !== set) {
+      setSprite(el.avatar, set);
       FX.flash(el.avatar, "swap", 600);
     }
+  }
+  /** Show a frame strip on a node (background-image, one frame wide). */
+  function setSprite(node, set) {
+    node.sprite = set; node.frame = -1;
+    node.style.backgroundImage = `url(${set.src})`;
+    node.style.backgroundSize = `${set.frames * 100}% 100%`;
+    showFrame(node, 0);
+  }
+  function showFrame(node, f) {
+    if (node.frame === f) return;
+    node.frame = f;
+    node.style.backgroundPositionX = node.sprite.frames > 1 ? (f / (node.sprite.frames - 1)) * 100 + "%" : "0";
+  }
+  /* Lip-sync: every frame, the mouth follows the voice (closed / half / wide). The level is
+     smoothed (opens fast, closes a little slower), each shape is held at least 85 ms and the
+     mouth moves one step at a time (never closed ↔ wide in one jump), so it reads as speech,
+     not flicker. Between words the avatars blink now and then. */
+  const lip = { k: 0, lvl: 0, since: 0, blinkAt: 0, blinkUntil: 0 };
+  function lipLoop(now) {
+    const m = FX.mouth();
+    lip.lvl += (m - lip.lvl) * (m > lip.lvl ? .7 : .5);
+    const up = lip.k === 0 ? .36 : .7, down = lip.k === 2 ? .62 : .26;  // a little hysteresis (tuned on all clips: ~9 changes/s, 25% closed · 32% half · 43% wide)
+    const want = lip.lvl > up ? lip.k + 1 : lip.lvl < down ? lip.k - 1 : lip.k;
+    if (want !== lip.k && now - lip.since > 85) { lip.k = Math.max(0, Math.min(2, want)); lip.since = now; }
+    const av = el.avatar.sprite;
+    if (av) {
+      let f = av.mouth[lip.k];
+      if (!lip.k && av.blink != null) {
+        if (now > lip.blinkAt) { lip.blinkUntil = now + 130; lip.blinkAt = now + 2600 + Math.random() * 2800; }
+        if (now < lip.blinkUntil) f = av.blink;
+      }
+      showFrame(el.avatar, f);
+    }
+    const ch = el.charArt.sprite;
+    if (ch && el.character.classList.contains("in")) showFrame(el.charArt, ch.mouth[lip.k]);
+    requestAnimationFrame(lipLoop);
   }
   function setBanner(text, mood) {
     el.bannerText.textContent = text;
@@ -381,32 +452,49 @@
     await speak(text);
     el.character.classList.remove("talk");
   }
-  /** Feedback line in a guided step: the spotlight moves to the narrator box while
-      Guddu talks, then returns to whatever was highlighted before. */
-  async function sayFocused(text, mood) {
+  /** Where a line looks: the spotlight the feedback animation plays in (see runFx), else the part's area. */
+  const fxArea = (fx) => (fx ? (PAD_FX.has(fx) ? "pad" : "tank") : S.area);
+  /** Feedback line in a guided step. `look` is the part of the screen the line talks about
+      ("Find 0 on the scale" → tank, "Enter 0 on the screen" → pad): it stays lit beside the
+      narrator box, so Guddu never points at something blurred. Without it only the narrator
+      box is lit. Afterwards the spotlight returns to whatever was highlighted before. */
+  async function sayFocused(text, mood, look) {
     const back = S.focusKey;
-    focusOn("narr");
+    focusOn(look || "narr");
+    if (look) FX.flash(el.ring0, "sweep", 1700);
     await say(text, mood);
-    if (back && S.focusKey === "narr") focusOn(back);
+    if (back && S.focusKey === (look || "narr")) focusOn(back);
   }
 
-  /** Narrator moment. In guided steps the glass blurs everything except the
-      narrator box, and the speaker slides in full size. */
-  async function narrate(text, { speaker = "guddu", mood = "happy" } = {}) {
+  /** Narrator moment. In guided steps the glass blurs everything except the narrator box
+      and `look` (the tank or keypad the line is about), and the speaker slides in full size. */
+  async function narrate(text, { speaker = "guddu", mood = "happy", pose = "talk", look = null } = {}) {
     S.phase = "narrate";
     setSpeaker(speaker);
     setBanner(text, mood);
     const full = S.guided && SPEAKERS[S.speaker].full;
     if (full) {
-      if (!el.character.src.endsWith(full)) el.character.src = full;
+      const set = POSES[pose] || POSES.talk;          // a gesture that fits the line (data.js `pose`)
+      if (el.charArt.sprite !== set) setSprite(el.charArt, set);
+      // He stands over what is NOT lit and points at what is: on keypad lines he moves in
+      // front of the (blurred) tank, mirrored, so the keypad stays completely visible.
+      const right = look === "pad";
+      el.character.classList.toggle("right", right);
+      el.charGlow.classList.toggle("right", right);
       el.character.classList.add("in", "talk");
+      el.stage.classList.add("host");               // one Guddu at a time: his line goes in the story's speech bubble beside him
+      placeBubble({ shape: "wide", tail: "left", w: 560, tip: right ? set.tipRight : set.tip }, text, el.hostBubble);
+      setTimeout(() => el.stage.classList.contains("host") && el.hostBubble.classList.add("on"), 380);   // as he lands
     }
-    focusOn("narr");
+    focusOn(look || "narr");
+    if (look && S.guided) FX.flash(el.ring0, "sweep", 1700);   // a new line: light sweeps the narrator box
     await FX.sleep(350);
     await speak(text);              // always plays to the end (no tap-to-skip)
     el.character.classList.remove("talk");
+    el.hostBubble.classList.remove("on");
     await FX.sleep(250);
     el.character.classList.remove("in");
+    el.stage.classList.remove("host");
   }
 
   /* =================================================================
@@ -424,7 +512,7 @@
       const phase = S.phase;
       S.phase = "feedback";
       setMarkerEnabled(false);
-      await sayFocused(p.idle.text, "think");
+      await sayFocused(p.idle.text, "think", fxArea(p.idle.fx));
       await runFx(p.idle.fx, q, p.idle);
       setBanner(p.ost, "happy");
       S.phase = phase;
@@ -533,7 +621,7 @@
     stopIdle();
     setMarkerEnabled(false);
     const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
-    await sayFocused(fb.text, "sad");
+    await sayFocused(fb.text, "sad", fxArea(fb.fx));
     await runFx(fb.fx, q, fb);
     setBanner(p.ost, "happy");
     S.phase = "marker";
@@ -573,6 +661,20 @@
       }
       case "glowUp":                                 // "Up arrow briefly glows."
         FX.flash(el.btnUp, "glow", 3000); await FX.sleep(1500); break;
+      case "glowDown":                               // "Down arrow briefly glows."
+        FX.flash(el.btnDown, "glow", 3000); await FX.sleep(1500); break;
+      case "pulseMarkerScale": {                     // "Marker and water-level scale pulse."
+        pulseMarker();
+        for (let L = Math.max(CFG.levelMin, S.view - HALF); L <= Math.min(CFG.levelMax, S.view + HALF); L++) pulseLevel(L);
+        await FX.sleep(1500); break;
+      }
+      case "pulseMarkerZero":                        // "Marker and 0 pulse."
+        pulseMarker(); pulseLevel(0);
+        await FX.sleep(1500); break;
+      case "arrowCount":                             // "Up arrow glows. +1 → +2 → +3 → +4 highlight one by one."
+        FX.flash(dir > 0 ? el.btnUp : el.btnDown, "glow", 3000);
+        await countPath(q.start, q.target);
+        break;
       case "glowDirUp":                              // "Upward direction glows."
         await glowDirection(q.start, 1); break;
       case "glowDirDown":                            // "Downward direction glows."
@@ -871,7 +973,7 @@
     S.phase = "feedback";
     stopIdle();
     const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
-    await sayFocused(fb.text, "sad");
+    await sayFocused(fb.text, "sad", fxArea(fb.fx));
     await runFx(fb.fx, q, fb);
     setBanner(p.ost, "happy");
     S.phase = "entry";
@@ -1065,12 +1167,14 @@
       focusOn(null);
       handHide();
       el.character.classList.remove("in", "talk");
+      el.stage.classList.remove("host");
+      el.hostBubble.classList.remove("on");
       S.countFrom = null;
       el.marker.classList.remove("locked");
       setWater(null);
       const L = levelAt(i);
       jumpTo(L);                                                    // new level starts on a settled tank
-      setPlate(step.plateStart || fmt(L));
+      setPlate(step.type === "question" ? "?" : fmt(L));      // a question starts on "?", never on the last answer
       if (step.section === "level2" || step.section === "level3") setMode("lvl");
       if (step.section === "level3") el.eqPanel.classList.add("hidden");   // the Level 3 challenge appears at R5
       setSpeaker(step.speaker);
@@ -1095,7 +1199,7 @@
       setTimeout(() => FX.sfx("confetti"), 120);
       FX.confetti(el.confetti, { count: 90, x: 820, y: 330 });
     }
-    await sayFocused(p.correct, "happy");
+    await sayFocused(p.correct, "happy", S.area);     // "Correct! You reached 0." with the scale (or display) still lit
     await FX.sleep(500);
   }
 
@@ -1114,11 +1218,11 @@
     // New question in the same level: the display (and equation) flip over to it
     // while the water re-levels to the new start.
     // The equation builds with the question's voice-over, unless it is already up
-    // (A0 after TR2 and B0 after R5 show it before the question starts).
+    // (A0 after TR2 and B1 after R5 show it before the question starts).
     const full = q.eq && termA(q.eq.a) + q.eq.op + termB(q.eq.b) + "=?";
     S.eqBuild = !!q.eq && !(!el.eqPanel.classList.contains("hidden") && el.eqPanel.textContent.replace(/\s/g, "") === full);
     const showQuestion = () => {
-      setPlate(q.plateStart || fmt(q.start));
+      setPlate("?");                                     // the new question starts on "?" (not the last answer)
       if (q.eq) renderEq(q);
       if (S.eqBuild) eqHide([el.eqOp, el.eqB, el.eqEq, el.eqAns], true);   // only the start level for now
     };
@@ -1145,7 +1249,7 @@
   /** Lever part: VO, the learner moves the marker, "Correct! You reached +2." */
   async function leverPart(q, p) {
     S.part = p; S.wrong = 0; S.area = "tank";
-    await Promise.all([narrate(p.vo), S.eqBuild && buildQuestionEq(q, p.vo)]);
+    await Promise.all([narrate(p.vo, { pose: p.pose, look: "tank" }), S.eqBuild && buildQuestionEq(q, p.vo)]);
     S.eqBuild = false;
     setBanner(p.ost, "happy");
     focusOn("tank");
@@ -1176,7 +1280,7 @@
     S.part = p; S.wrong = 0; S.area = "pad";
     showPlate();
     showPanel();
-    await Promise.all([narrate(p.vo), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
+    await Promise.all([narrate(p.vo, { pose: p.pose, look: "pad" }), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
     S.eqBuild = false;
     S.entry = "";
     entryDisplay();
@@ -1211,8 +1315,10 @@
       S.entry = ""; entryDisplay();
       showPlate(); showPanel();
     }
+    // the line is about the lever (H1, H2) or the dial (H3, H4): keep that lit while it plays
+    const look = step.act === "leverUpDown" || step.act === "leverMark" ? "tank" : "pad";
     if (!step.ostFirst) {
-      await narrate(step.vo, { speaker: step.speaker });
+      await narrate(step.vo, { speaker: step.speaker, pose: step.pose, look });
       setBanner(step.ost, "happy");
     } else {
       setSpeaker(step.speaker);
@@ -1271,7 +1377,7 @@
         FX.badge(el.fx, pp.x + 250, pp.y, true);
         FX.sfx("correct");
         await FX.sleep(1600);
-        await narrate(step.vo, { speaker: step.speaker });
+        await narrate(step.vo, { speaker: step.speaker, pose: step.pose, look: "padTank" });   // both stay lit with their tick
         break;
       }
     }
@@ -1353,7 +1459,7 @@
         document.querySelectorAll(".key:not(.key--sign)").forEach((k) => FX.flash(k, "keypulse", 2800));
         break;
       case "showNextEq":                                 // "The first water-level challenge appears."
-        if (nextQ && nextQ.eq) { renderEq(nextQ); showEqPanel(); setPlate(fmt(nextQ.start)); }
+        if (nextQ && nextQ.eq) { renderEq(nextQ); showEqPanel(); setPlate("?"); }
         break;
       case "padActive":                                  // "Dial pad stays active."
         FX.flash(el.panel, "activate", 1300);
@@ -1391,26 +1497,99 @@
   };
   let shotIdx = 0;
 
-  function placeBubble(b, text) {
+  function placeBubble(b, text, node = el.bubble) {
+    const img = node.querySelector("img"), box = node.querySelector("p");
     const art = BUBBLES[b.shape], flip = b.tail !== art.tail;
     const w = b.w, h = w * art.ratio;
     const tx = flip ? 1 - art.tip[0] : art.tip[0], ty = art.tip[1];
     const [l, t, tw, th] = art.text;
-    Object.assign(el.bubble.style, {
+    Object.assign(node.style, {
       width: w + "px", left: b.tip[0] - tx * w + "px", top: b.tip[1] - ty * h + "px",
       transformOrigin: `${tx * 100}% ${ty * 100}%`                 // pops out of the tail
     });
-    el.bubble.classList.toggle("flip", flip);
-    if (!el.bubbleImg.src.endsWith(art.src)) el.bubbleImg.src = art.src;
-    Object.assign(el.bubbleText.style, {
+    node.classList.toggle("flip", flip);
+    if (!img.src.endsWith(art.src)) img.src = art.src;
+    Object.assign(box.style, {
       left: (flip ? 1 - l - tw : l) * w + "px", top: t * h + "px", width: tw * w + "px", height: th * h + "px"
     });
-    el.bubbleText.textContent = text;
+    box.textContent = text;
     // largest font that keeps the line inside the bubble (the bubble itself never changes size)
     for (let fs = 50; fs >= 20; fs -= 2) {
-      el.bubbleText.style.fontSize = fs + "px";
-      if (el.bubbleText.scrollHeight <= el.bubbleText.clientHeight + 1 && el.bubbleText.scrollWidth <= el.bubbleText.clientWidth + 1) break;
+      box.style.fontSize = fs + "px";
+      if (box.scrollHeight <= box.clientHeight + 1 && box.scrollWidth <= box.clientWidth + 1) break;
     }
+  }
+
+  /* Story scenes with an empty tank (scene-pXXe, `tank` in data.js): the water is
+     drawn here, between the scene art and the characters (cut out of the same art,
+     chars-pXXe.png), so it rises and falls with the line. The glass and the scale are
+     in the same place in all four scenes (stage px). */
+  const ST_TANK = { top: 228, bottom: 938, zeroY: 570, step: 90, labelX: 922 };
+  const stLevelY = (L) => ST_TANK.zeroY - ST_TANK.step * L;
+  function tankLayers(shot) {
+    if (shot.tank) return shot.tank;
+    const fx = document.createElement("div");
+    fx.className = "tank-fx";
+    fx.innerHTML = `<div class="tstream pour"><i></i></div>
+      <div class="twater"><div class="wave wave--back"></div><div class="wave wave--front"></div><div class="bubbles"></div></div>
+      <div class="tscale"></div>`;
+    const top = document.createElement("div");
+    top.className = "tstream-top pour"; top.innerHTML = "<i></i>";
+    const chars = document.createElement("img");
+    chars.className = "chars"; chars.alt = ""; chars.draggable = false;
+    shot.querySelector("img").after(fx, top, chars);
+    const scale = fx.querySelector(".tscale");
+    for (let L = -3; L <= 3; L++) {                // the scale on the glass, in front of the water
+      const d = document.createElement("div");
+      d.className = "tlab";
+      d.style.top = stLevelY(L) - ST_TANK.top + "px";
+      d.innerHTML = `<i></i><span>${fmt(L)}</span>`;
+      scale.appendChild(d);
+    }
+    buildBubbles(fx.querySelector(".bubbles"), 8);
+    return (shot.tank = { fx, top, chars, water: fx.querySelector(".twater"), stream: fx.querySelector(".tstream"), level: 0, timer: null });
+  }
+  function showTank(shot, step) {
+    const on = !!step.tank;
+    if (!on && !shot.tank) return null;
+    const t = tankLayers(shot);
+    [t.fx, t.top, t.chars].forEach((n) => n.classList.toggle("tank-off", !on));
+    if (!on) return null;
+    t.chars.src = `assets/story/chars-${step.scene}.png`;
+    setTankLevel(t, step.tank.from, true);
+    return t;
+  }
+  /** Move a story tank's water to level L. Returns how long it takes (ms). While it
+      rises the pipe pours (the stream falls from the pipe, then the tail drops away). */
+  function setTankLevel(t, L, instant = false) {
+    const d = Math.abs(L - t.level), ms = instant || !d ? 0 : 250 + 320 * d;
+    const y = stLevelY(L) - ST_TANK.top;
+    t.water.style.transitionDuration = ms + "ms";
+    t.water.style.top = y + "px";
+    t.water.style.height = ST_TANK.bottom - ST_TANK.top - y + "px";
+    t.stream.style.transition = `height ${ms}ms ease-in-out, clip-path .32s cubic-bezier(.55, 0, 1, .45)`;
+    t.stream.style.height = y + 6 + "px";                         // the stream reaches the water surface
+    if (ms) {
+      t.water.classList.add("moving");
+      FX.sfxLoop(L > t.level ? "fill" : "drain", ms + 200);
+      if (L > t.level) [t.top, t.stream].forEach((n) => {
+        if (n.classList.contains("on")) return;
+        n.classList.add("reset"); n.classList.remove("off");    // a stream that was stopping goes back to the pipe at once
+        void n.getBoundingClientRect();
+        n.classList.remove("reset"); n.classList.add("on");      // … and pours again
+      });
+      clearTimeout(t.timer);
+      t.timer = setTimeout(() => {
+        t.water.classList.remove("moving");
+        [t.top, t.stream].forEach((n) => { if (n.classList.contains("on")) n.classList.replace("on", "off"); });
+      }, ms);
+    } else {
+      clearTimeout(t.timer);
+      t.water.classList.remove("moving");
+      [t.top, t.stream].forEach((n) => n.classList.remove("on", "off"));
+    }
+    t.level = L;
+    return ms;
   }
 
   async function runScene(step) {
@@ -1434,6 +1613,7 @@
     }
     const spots = shot.querySelector(".spots");
     spots.innerHTML = "";
+    const tank = showTank(shot, step);               // empty-tank scenes: the water and the characters' layer
 
     // camera: a slow move toward a point for the length of the line
     const readMs = Math.max(3500, FX.readTime(step.vo) + 1500);
@@ -1469,10 +1649,15 @@
         void lever.offsetWidth; lever.classList.add("on");
         await FX.sleep(400);
       }
-      for (const [x, y] of step.glow || []) {
+      if (tank && step.tank.to != null) setTankLevel(tank, step.tank.to);   // the water goes to one level while the marks light
+      for (const g of step.glow || []) {
+        // a glow is [x, y] on the art, or a level on an empty-tank scene's drawn scale
+        const [x, y] = typeof g === "number" ? [ST_TANK.labelX, stLevelY(g)] : g;
+        const neg = typeof g === "number" ? g < 0 : y > 600;
+        if (tank && step.tank.to == null) await FX.sleep(setTankLevel(tank, g));   // the water reaches the mark, then it lights
         if (lever) { lever.style.top = y + "px"; await FX.sleep(300); }
         const d = document.createElement("div");
-        d.className = "spot" + (y > 600 ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
+        d.className = "spot" + (neg ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
         spots.appendChild(d);
         void d.offsetWidth; d.classList.add("on");
         FX.sfx("tick");
@@ -1497,45 +1682,70 @@
     S.phase = "idle";
   }
 
-  /** Story → game: the camera moves into the tank and the game appears. */
-  async function storyExit(next) {
-    const shot = el.shots[shotIdx];
-    if (next) { setSpeaker(next.speaker); setBanner(firstLine(next), "happy"); }   // the game's first line is already up
-    el.bubble.classList.remove("on"); el.caption.classList.remove("on");
-    if (!REDUCED) {
-      shot.getAnimations().forEach((a) => a.cancel());
-      shot.style.transformOrigin = "1045px 560px";                 // the tank in the scene art
-      shot.animate([{ transform: "scale(1)" }, { transform: "scale(2.4)" }], { duration: 1100, easing: "cubic-bezier(.6,0,.9,.6)", fill: "forwards" });
-      FX.sfx("splashIn");
-    }
-    await el.story.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: REDUCED ? 300 : 1100, fill: "forwards" }).finished;
-    el.story.classList.add("hidden");
-    el.story.getAnimations().forEach((a) => a.cancel());
-    el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
+  /* Chapter break (story ↔ game): water floods up from the bottom of the screen, a
+     title card (the CSV section name) floats up in it, then the water drains away and
+     reveals what was set up underneath. `tap`: the learner presses ▶ to go on. */
+  async function floodWipe(title, { tap = false, during = null } = {}) {
+    const f = el.flood, water = f.querySelector(".flood-water"), card = f.querySelector(".flood-card");
+    const go = f.querySelector("#floodGo");
+    card.querySelector("h2").textContent = title || "";
+    go.classList.toggle("hidden", !tap);
+    card.classList.remove("on", "away");
+    f.classList.remove("hidden");
+    const move = (from, to, ms, easing) => REDUCED
+      ? water.animate([{ transform: "translateY(-40px)", opacity: from === "1200px" ? 0 : 1 }, { transform: "translateY(-40px)", opacity: to === "1200px" ? 0 : 1 }], { duration: 300, fill: "forwards" }).finished
+      : water.animate([{ transform: `translateY(${from})` }, { transform: `translateY(${to})` }], { duration: ms, easing, fill: "forwards" }).finished;
+    FX.sfx("splashIn");
+    FX.sfxLoop("fill", 1300);
+    await move("1200px", "-40px", 1200, "cubic-bezier(.45, 0, .25, 1)");        // the screen fills up
+    FX.sfx("bubbles");
+    if (during) await during();                                          // what comes next is set up under the water
+    if (title) card.classList.add("on");
+    if (tap) {
+      await FX.sleep(500);
+      go.focus({ preventScroll: true });
+      await new Promise((r) => { go.onclick = () => { go.onclick = null; FX.sfx("button"); r(); }; });
+    } else await FX.sleep(title ? 1900 : 450);
+    if (title) { card.classList.replace("on", "away"); await FX.sleep(350); }   // the card floats off
+    FX.sfxLoop("drain", 1200);
     FX.sfx("splashOut");
-    await FX.sleep(300);
+    await move("-40px", "1200px", 1100, "cubic-bezier(.55, 0, .75, 1)");      // … and the water drains away
+    f.classList.add("hidden");
+    card.classList.remove("away");
+    water.getAnimations().forEach((a) => a.cancel());
   }
 
-  /** Game → story (Story End): the camera pulls back out of the tank into the scene. */
+  /** Story → game: the screen floods, "How to Play" (tap ▶), and the game appears as it drains. */
+  async function storyExit(next) {
+    el.bubble.classList.remove("on"); el.caption.classList.remove("on");
+    await floodWipe(DATA.ui.howTo, {
+      tap: true,
+      during: async () => {
+        if (next) { setSpeaker(next.speaker); setBanner(firstLine(next), "happy"); }   // the game's first line is already up
+        el.story.classList.add("hidden");
+        el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
+      }
+    });
+  }
+
+  /** Game → story (Story End): the screen floods and the ending scene appears as the water
+      drains (no card). */
   async function storyEnter(step) {
     focusOn(null);
     el.bubble.classList.remove("on"); el.caption.classList.remove("on");
-    const shot = el.shots[shotIdx];
-    shot.querySelector("img").src = `assets/story/scene-${step.scene}.jpg`;
-    shot.querySelector(".spots").innerHTML = "";
-    shot.style.transition = "none";
-    shot.classList.add("on");
-    el.shots[1 - shotIdx].classList.remove("on");
-    void shot.offsetWidth;
-    shot.style.transition = "";
-    el.story.classList.remove("hidden");
-    if (!REDUCED) {
-      shot.style.transformOrigin = "1040px 575px";                 // the tank in the scene art
-      shot.animate([{ transform: "scale(2.4)" }, { transform: "scale(1)" }], { duration: 1300, easing: "cubic-bezier(.1,.5,.3,1)" });
-      FX.sfx("splashOut");
-    }
-    await el.story.animate([{ opacity: 0 }, { opacity: 1 }], { duration: REDUCED ? 300 : 700, easing: "ease-out" }).finished;
-    await FX.sleep(REDUCED ? 0 : 600);
+    await floodWipe(null, {                          // no card here: the water rises and drains straight into the ending
+      during: async () => {
+        const shot = el.shots[shotIdx];
+        shot.querySelector("img").src = `assets/story/scene-${step.scene}.jpg`;
+        shot.querySelector(".spots").innerHTML = "";
+        shot.style.transition = "none";
+        shot.classList.add("on");
+        el.shots[1 - shotIdx].classList.remove("on");
+        void shot.offsetWidth;
+        shot.style.transition = "";
+        el.story.classList.remove("hidden");
+      }
+    });
   }
 
   /* =================================================================
@@ -1552,7 +1762,7 @@
     setBanner(step.ost, "happy");
     if (step.appear === "eqPanel") {                       // "Equation panel appears beside the tank."
       setMode("lvl");
-      if (next && next.start != null) setPlate(fmt(next.start));
+      if (next && next.start != null) setPlate("?");
       await FX.sleep(400);
       if (next && next.eq) renderEq(next);
       showEqPanel();
@@ -1569,7 +1779,7 @@
     stopIdle();
     el.gateBtn.classList.add("hidden");
     if (step.then === "activateScaleDial") {               // "Tank scale and dial become active."
-      if (next && next.start != null) setPlate(fmt(next.start));
+      if (next && next.start != null) setPlate("?");
       [el.panel, el.plate, el.connector].forEach((n) => n.classList.remove("away"));
       await FX.sleep(600);
       await glowDirection(S.view - HALF - 1, 1, 500);     // light sweeps up the whole scale
@@ -1644,7 +1854,7 @@
     }
     if (["level2", "level3", "end"].includes(at.section)) setMode("lvl");   // Level 2 on: keypad in level mode
     if (before.some((s) => s.fx === "leverStuck")) el.stage.classList.add("lever-off");
-    setPlate(at.plateStart || fmt(levelAt(START_INDEX)));
+    setPlate(at.type === "question" ? "?" : fmt(levelAt(START_INDEX)));
     before.forEach((s) => s.type === "question" && markProgress(s.id, true));
   }
 
@@ -1698,6 +1908,8 @@
     fitStage();
     buildScale();
     buildBubbles();
+    buildBubbles(el.flood.querySelector(".bubbles"), 34, 1880);
+    requestAnimationFrame(lipLoop);                  // the characters' mouths follow the voice
     buildProgress();
     // Start state for the first step played (the first step, or the QA jump target)
     const first = DATA.steps[START_INDEX];
@@ -1736,11 +1948,13 @@
   }
 
   // Preload images so nothing pops in mid-animation
-  const PRELOAD = ["bg", "tank-empty", "pipe-in-dry", "pipe-in-water", "pipe-out-dry", "pipe-out-water", "track",
+  const PRELOAD = ["bg", "tank-empty", "pipe-in-dry", "pipe-out-dry", "track",
     "btn-up", "btn-down", "plate-blue", "panel-cream", "strip-cream", "board-green", "panel-title",
-    "banner-bar", "guddu-happy", "guddu-sad", "guddu-think", "guddu-full", "pari-full", "pari-happy",
+    "banner-bar",
     "asset_speech_bubble_blank", "asset_p09_overlay_6218b7e3"].map((n) => `assets/${n}.png`)
-    .concat([...new Set(DATA.steps.filter((s) => s.scene).map((s) => `assets/story/scene-${s.scene}.jpg`))]);
+    .concat([...new Set(DATA.steps.filter((s) => s.scene).map((s) => `assets/story/scene-${s.scene}.jpg`))])
+    .concat(DATA.steps.filter((s) => s.tank).map((s) => `assets/story/chars-${s.scene}.png`))
+    .concat([...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src));
   Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; })))
     .then(init);
   fitStage();

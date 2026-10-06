@@ -249,4 +249,6 @@ async function makeMusic() {
 (async () => {
   if (ARGS.has("--music")) await makeMusic();
   await makeVoice();
+  // the mouths follow the voice: refresh the loudness data for the new clips
+  spawnSync(process.execPath, [path.join(ROOT, "tools/make-lipsync.mjs")], { stdio: "inherit" });
 })().catch((e) => { console.error(e); process.exit(1); });

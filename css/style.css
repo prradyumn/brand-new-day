@@ -190,6 +190,69 @@ button { font-family: inherit; cursor: pointer; }
 #pipeIn  { left: 1172px; top: -168px; width: 363px; height: 273px; z-index: 11; }
 #pipeOut { left: 1595px; top: 868px;  width: 217px; height: 163px; z-index: 11; }
 
+/* ---------------- Pipe water (CSS + SVG; the pipe images never change) ----------------
+   The inlet stream falls from the pipe mouth (1478, 74) to the water surface (its
+   height follows the water in render()); the outlet stream curves out of the
+   outlet mouth (1755, 991). .on = pouring (it falls from the pipe), .off = stopping
+   (the tail drops away), .reset = back to "not poured yet" without animating. */
+.stream { pointer-events: none; }
+.stream.reset, .stream.reset *, .pour.reset { transition: none !important; }
+/* .pour = a falling stream of water (the game's inlet and the story tanks' inlet) */
+.pour {
+  background: linear-gradient(90deg, #1f8fe3 0, #57bdf7 18%, #a9e4ff 38%, #effbff 48%, #8fd8ff 60%, #3aa6ee 84%, #1a7fd6 100%);
+  box-shadow: inset 3px 0 0 rgba(10, 80, 170, .55), inset -3px 0 0 rgba(10, 80, 170, .55);   /* a darker edge, like the art's outlines */
+  opacity: .95;
+  filter: url(#liquid);
+  clip-path: inset(0 0 100% 0 round 0 0 23px 23px);
+}
+.pour.on  { clip-path: inset(0 0 0 0 round 0 0 23px 23px); }
+.pour.off { clip-path: inset(100% 0 0 0 round 23px); }
+#streamIn { left: 1455px; top: 70px; width: 46px; height: 500px; z-index: 10; transition: height .55s var(--ease-out); }
+.pour i {                            /* a highlight running down the stream */
+  position: absolute; left: 12px; width: 9px; top: 0; bottom: 0; border-radius: 5px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0) 0 22px, rgba(255, 255, 255, .8) 22px 36px);
+  background-size: 100% 58px; animation: streamDown .3s linear infinite;
+}
+#streamIn.on  { transition: height .55s var(--ease-out), clip-path .32s cubic-bezier(.55, 0, 1, .45); }
+#streamIn.off { transition: height .55s var(--ease-out), clip-path .42s cubic-bezier(.55, 0, 1, .45); }
+#splashIn {                          /* where the stream hits the water: ripples + droplets */
+  left: 1478px; top: 570px; width: 0; height: 0; z-index: 10; pointer-events: none;
+  opacity: 0; transition: top .55s var(--ease-out), opacity .3s;
+}
+#splashIn.on { opacity: 1; }
+#splashIn b {
+  position: absolute; left: -42px; top: -11px; width: 84px; height: 22px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .85); animation: ripple .9s ease-out infinite;
+}
+#splashIn b + b { animation-delay: .45s; }
+#splashIn i {
+  position: absolute; width: 10px; height: 10px; margin: -5px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #a8e4ff 60%, #3aaef0);
+  animation: splashDrop .7s ease-out infinite;
+}
+#splashIn i:nth-of-type(1) { --dx: -34px; --dy: -44px; }
+#splashIn i:nth-of-type(2) { --dx: 30px;  --dy: -54px; animation-delay: .18s; }
+#splashIn i:nth-of-type(3) { --dx: -16px; --dy: -30px; animation-delay: .36s; }
+#splashIn i:nth-of-type(4) { --dx: 42px;  --dy: -26px; animation-delay: .52s; }
+#water.instant ~ #streamIn, #water.instant ~ #splashIn { transition: none; }
+#streamOut { left: 0; top: 0; width: 1920px; height: 1080px; z-index: 10; overflow: visible; }
+#streamOut .flow {
+  fill: none; stroke: url(#outGrad); stroke-width: 40; stroke-linecap: round;
+  stroke-dasharray: 100 100; stroke-dashoffset: 100;           /* pathLength 100: hidden until it pours */
+}
+#streamOut .flow.edge { stroke: #0f5aa8; stroke-width: 46; stroke-opacity: .75; }   /* the darker outline under the stream */
+#streamOut.on .flow  { stroke-dashoffset: 0;    transition: stroke-dashoffset .35s cubic-bezier(.55, 0, 1, .45); }
+#streamOut.off .flow { stroke-dashoffset: -100; transition: stroke-dashoffset .45s cubic-bezier(.55, 0, 1, .45); }
+#streamOut .streak {
+  fill: none; stroke: rgba(255, 255, 255, .8); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 16 30;
+  opacity: 0; transition: opacity .2s; animation: streakFlow .35s linear infinite;
+}
+#streamOut.on .streak { opacity: 1; transition: opacity .25s .2s; }
+#streamOut .drop { fill: #c4ecff; opacity: 0; }
+#streamOut.on .drop { animation: outDrop .8s ease-in infinite; }
+#streamOut.on .drop:nth-of-type(2) { animation-delay: .27s; }
+#streamOut.on .drop:nth-of-type(3) { animation-delay: .53s; }
+
 /* ---------------- Water (pure CSS, sits behind the glass) ---------------- */
 #water {
   left: 1214px; width: 387px; top: 570px; height: 393px;
@@ -356,11 +419,12 @@ button { font-family: inherit; cursor: pointer; }
   border: 48px solid transparent;
   border-image: url(../assets/banner-bar.png) 120 fill / 48px stretch;
   z-index: 19;
-  transition: transform .4s var(--ease-spring);
+  transition: transform .4s var(--ease-spring), opacity .3s;
 }
 #banner > * { position: absolute; }
-#avatar {
-  left: -39px; top: -42px; width: 113px; height: 114px; object-fit: contain;
+#avatar {                  /* a frame strip (assets/char/avatar-*.png); game.js picks the frame: mouth, blink */
+  left: -39px; top: -42px; width: 114px; height: 114px;
+  background-repeat: no-repeat; background-position: 0 0;
   transition: transform .3s var(--ease-spring);
 }
 #avatar.swap { animation: avatarBounce .5s var(--ease-spring); }
@@ -374,15 +438,37 @@ button { font-family: inherit; cursor: pointer; }
 #bannerText.long { font-size: 28px; }
 #banner.speak { transform: scale(1.015); }
 
-#character {
-  left: 40px; top: 330px; height: 720px; width: auto;
+/* Full-size Guddu, the game's host (guided steps): big, anchored in the bottom-left
+   corner and cropped at the knees by the screen edge, so he never floats. He pops up
+   with a spring, breathes while he talks, and ducks back down when he's done. His line
+   shows in the story's speech bubble (#hostBubble) and the narrator box steps aside. */
+#character {               /* .art holds the frame strip per pose (assets/char/guddu-*.png, 708 × 1320 frames) */
+  left: 13px; top: 290px; width: 568px; height: 1060px;
   z-index: 45; pointer-events: none;
-  transform: translateX(-130%); opacity: 0;
-  transition: transform .7s var(--ease-out), opacity .5s;
-  filter: drop-shadow(0 18px 24px rgba(0,0,0,.25));
+  transform-origin: 42% 100%;
+  transform: translate(-14%, 78%) rotate(-5deg); opacity: 0;
+  transition: transform .42s cubic-bezier(.55, 0, 1, .45), opacity .25s .17s;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .95)) drop-shadow(0 0 18px rgba(255, 255, 255, .5)) drop-shadow(0 18px 26px rgba(0, 20, 60, .3));
 }
-#character.in { transform: translateX(0); opacity: 1; }
-#character.talk { animation: talkBob 1.2s ease-in-out infinite; }
+#character .art { position: absolute; inset: 0; background-repeat: no-repeat; background-position: 0 0; }
+/* He stands over the part of the screen that is NOT lit and points at the part that is:
+   keypad lines → in front of the (blurred) tank, mirrored, pointing left at the keypad. */
+#character.right { left: 814px; transform-origin: 58% 100%; transform: translate(14%, 78%) rotate(5deg); }
+#character.right .art { transform: scaleX(-1); }
+#character.in { transform: none; opacity: 1; transition: transform .75s var(--ease-spring), opacity .2s; }
+#character.in.talk { animation: hostBreathe 2.6s ease-in-out infinite; }   /* `translate` adds to the entrance transform */
+#charGlow {                /* a soft light behind him, so he stands out from the frosted background */
+  left: -170px; top: 300px; width: 860px; height: 860px; z-index: 44; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 248, 215, .7), rgba(255, 240, 190, .28) 55%, rgba(255, 240, 190, 0));
+  opacity: 0; transform: scale(.7); transition: opacity .4s, transform .6s var(--ease-out);
+}
+#stage.host #charGlow { opacity: 1; transform: none; }
+#charGlow.right { left: 670px; }
+#stage.host #banner { opacity: 0; transform: translateY(-16px); }   /* one Guddu at a time: his line is in the bubble */
+@keyframes hostBreathe {       /* a gentle rise and fall: moving only, never resizing, so the art stays crisp */
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
 
 /* ---------------- Focus layer: frosted glass with spotlight holes ---------------- */
 #focus {
@@ -447,6 +533,32 @@ button { font-family: inherit; cursor: pointer; }
 .card h1 { margin: 0 0 16px; font-size: 92px; line-height: 1; font-weight: 900; color: #0d3b8c; text-shadow: 0 4px 0 rgba(255,255,255,.8); }
 .card h1 span { color: #ef7a00; font-size: 78px; }
 .card p { margin: 0 0 40px; font-size: 38px; font-weight: 800; color: #4a3b1c; }
+
+/* ---------------- Chapter break: the screen floods (story ↔ game) ---------------- */
+#flood { inset: 0; width: 1920px; height: 1080px; z-index: 85; overflow: hidden; }
+#flood .flood-water {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1160px; transform: translateY(1200px);   /* full = translateY(-40px): covers the stage, wave crests included */
+  background:
+    radial-gradient(70% 55% at 50% 40%, rgba(255, 255, 255, .22), transparent 70%),
+    linear-gradient(180deg, #6fd6ff 0%, #2fb0f5 16%, #1791e6 52%, #0b5fb8 100%);
+}
+#flood .wave { height: 46px; top: -30px; background-size: 260px 46px; }
+#flood .wave--front { top: -18px; }
+#flood .flood-card {
+  position: absolute; left: 50%; top: 50%; width: 820px; padding: 96px 90px 104px; box-sizing: border-box; text-align: center;
+  background: url(../assets/panel-title.png) center / 100% 100% no-repeat;
+  opacity: 0; transform: translate(-50%, 60%) scale(.9);
+  transition: opacity .4s, transform .9s var(--ease-spring);
+}
+#flood .flood-card.on { opacity: 1; transform: translate(-50%, -50%); }
+#flood .flood-card.away { opacity: 0; transform: translate(-50%, -140%); transition: opacity .35s ease-in, transform .45s ease-in; }
+#flood .flood-card h2 {
+  margin: 0; font-size: 92px; line-height: 1.05; font-weight: 900; color: #0d3b8c;
+  text-shadow: 0 4px 0 rgba(255, 255, 255, .8);
+  animation: floodBob 2.4s ease-in-out infinite;       /* it floats */
+}
+#flood .flood-card .big-btn { margin-top: 34px; }
+@keyframes floodBob { 50% { transform: translateY(-8px); } }
 
 /* ---------------- Tutorial demo hand ---------------- */
 #hand {
@@ -562,6 +674,41 @@ button { font-family: inherit; cursor: pointer; }
 #story .sign.plus { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5b400 60%, #d68f00); }
 #story .sign.minus { background: radial-gradient(circle at 35% 30%, #8fd0ff, #2b8cf2 60%, #1466d4); }
 #story .sign.on { opacity: 1; transform: scale(1); }
+/* Story scenes with an empty tank (p07e–p10e): water drawn between the scene art and
+   the characters (cut out of the same art). Glass interior 852–1238 × 228–938 (stage px). */
+#story .tank-fx {
+  position: absolute; left: 852px; top: 228px; width: 386px; height: 710px; overflow: hidden; pointer-events: none;
+  border-radius: 0 0 46% 46% / 0 0 34px 34px;
+}
+#story .twater {
+  position: absolute; left: 0; right: 0; top: 342px; height: 368px; opacity: .9;
+  background:
+    radial-gradient(120% 60% at 30% 100%, rgba(0, 70, 160, .35), transparent 70%),
+    linear-gradient(180deg, #6fd6ff 0%, #2fb0f5 22%, #1791e6 60%, #0d6fcf 100%);
+  box-shadow: inset 0 14px 22px -12px rgba(255, 255, 255, .75), inset 0 -20px 30px rgba(0, 40, 110, .35);
+  transition-property: top, height; transition-timing-function: ease-in-out;
+  overflow: visible;
+}
+#story .twater::after {              /* the glass highlights, over the water */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0 6%, rgba(255,255,255,.4) 8%, rgba(255,255,255,.12) 12%, rgba(255,255,255,0) 15%,
+      rgba(255,255,255,0) 82%, rgba(255,255,255,.35) 85%, rgba(255,255,255,.1) 89%, rgba(255,255,255,0) 92%);
+}
+#story .twater.moving .wave--front { animation-duration: 1.1s; }
+#story .twater.moving .wave--back { animation-duration: 1.6s; }
+#story .tstream { position: absolute; left: 14px; top: 0; width: 46px; height: 0; }
+#story .tstream-top { position: absolute; left: 866px; top: 112px; width: 46px; height: 56px; pointer-events: none; }
+#story .tstream-top.on  { transition: clip-path .2s cubic-bezier(.55, 0, 1, .45); }
+#story .tstream-top.off { transition: clip-path .3s cubic-bezier(.55, 0, 1, .45); }
+#story .tscale { position: absolute; inset: 0; }
+#story .tlab { position: absolute; left: 10px; height: 0; display: flex; align-items: center; gap: 16px; }
+#story .tlab i { width: 22px; height: 4px; border-radius: 2px; background: #1b2a4a; }
+#story .tlab span {
+  font: 900 34px/1 "Nunito", system-ui, sans-serif; color: #1b2a4a;
+  text-shadow: 0 0 6px rgba(255, 255, 255, .9), 0 0 2px rgba(255, 255, 255, .9);
+}
+#story .chars { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+#story .tank-off { display: none; }
 #story .lever {                      /* Story End row 4: a lever marker that slides along the scale */
   position: absolute; width: 120px; height: 46px; margin: -23px 0 0 -60px;
   filter: drop-shadow(0 0 10px rgba(255, 210, 40, .9)) drop-shadow(0 4px 4px rgba(0, 0, 0, .25));
@@ -577,12 +724,14 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Speech bubble: the artwork keeps its own proportions (width set, height from the image);
    the text sits in the bubble's inner area and the font shrinks to fit. */
-#bubble { position: absolute; opacity: 0; transform: scale(.55); pointer-events: none;
+/* The story's speech bubble; #hostBubble is the same bubble for full-size Guddu in the game */
+#bubble, #hostBubble { position: absolute; opacity: 0; transform: scale(.55); pointer-events: none;
   transition: opacity .25s ease, transform .45s var(--ease-spring); }
-#bubble.on { opacity: 1; transform: scale(1); }
-#bubble img { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(0, 30, 70, .25)); }
-#bubble.flip img { transform: scaleX(-1); }
-#bubbleText {
+#bubble.on, #hostBubble.on { opacity: 1; transform: scale(1); }
+#bubble img, #hostBubble img { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(0, 30, 70, .25)); }
+#bubble.flip img, #hostBubble.flip img { transform: scaleX(-1); }
+#hostBubble { z-index: 47; }                     /* above the frosted glass, beside Guddu's head */
+#bubbleText, #hostBubble p {
   position: absolute; margin: 0; display: flex; align-items: center; justify-content: center;
   text-align: center; font-weight: 900; line-height: 1.12; color: #111; overflow: hidden;
 }
@@ -717,6 +866,20 @@ button { font-family: inherit; cursor: pointer; }
   25% { transform: scale(1.15); opacity: 1; }
   75% { transform: scale(1); opacity: 1; }
   100% { transform: scale(.85); opacity: 0; }
+}
+@keyframes streamDown { to { background-position: 0 58px; } }
+@keyframes streakFlow { to { stroke-dashoffset: -46; } }
+@keyframes ripple { from { transform: scale(.35); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes splashDrop {
+  0% { transform: translate(0, 0) scale(.6); opacity: 0; }
+  15% { opacity: 1; }
+  50% { transform: translate(calc(var(--dx) * .6), var(--dy)) scale(1); }
+  100% { transform: translate(var(--dx), 8px) scale(.7); opacity: 0; }
+}
+@keyframes outDrop {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(var(--dx), 110px); opacity: 0; }
 }
 @keyframes eqPop {
   0% { transform: scale(.4); }

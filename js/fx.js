@@ -56,6 +56,23 @@
      word (game.js untilWord). Recorded clip: its playhead. Browser voice or muted:
      the time since the line began, against its reading time. */
   let line = null, lastLine = null;               // line: { text, t0, ms, clip }
+  /* How open the speaker's mouth should be right now, 0…1 (game.js lip-sync).
+     Recorded clip: its loudness at the playhead (assets/vo/lipsync.js, one digit per
+     50 ms). Browser voice or muted: a talking rhythm for the line's reading time. */
+  const LIPS = window.VO_LIPSYNC || {};
+  FX.mouth = () => {
+    if (!line) return 0;
+    if (line.clip) {
+      const env = LIPS[line.clipSrc];
+      if (!env || voEl.paused) return 0;
+      const i = Math.floor(voEl.currentTime / 0.05);
+      return i < env.length ? +env[i] / 9 : 0;
+    }
+    const t = performance.now() - line.t0;
+    if (t > line.ms - 700) return 0;                // the reading time includes a pause at the end
+    const s = t / 1000;
+    return Math.max(0, .55 * Math.sin(s * 14) + .45 * Math.sin(s * 8.7 + 1.3));
+  };
   FX.progress = (text) => {
     if (!line || line.text !== text) return lastLine === text ? 1 : 0;
     if (line.clip) return voEl.duration ? voEl.currentTime / voEl.duration : 0;
@@ -159,7 +176,7 @@
       const clip = FX.clipFor(text, opts.speaker);
       if (clip) {
         clipOn = true;
-        line.clip = true;
+        line.clip = true; line.clipSrc = clip;
         let started = false;
         const toSynth = (why) => {                       // clip missing / blocked: the browser voice reads it
           if (done || muting || !clipOn) return;
