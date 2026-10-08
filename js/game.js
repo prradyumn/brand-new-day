@@ -321,6 +321,24 @@
     }, 900);
   }
 
+  /** The marker locks on an answer: a ripple runs over the water and the number on the scale pops. */
+  function lockBurst(L) {
+    if (!REDUCED) {
+      for (const d of [0, 220]) setTimeout(() => {
+        const r = document.createElement("div");
+        r.className = "ripple"; el.water.appendChild(r);
+        setTimeout(() => r.remove(), 1100);
+      }, d);
+    }
+    FX.flash(S.labels[L], "lockpop", 700);
+  }
+  /** "Level Complete!": the water in the tank sparkles. */
+  function waterSparkle() {
+    FX.flash(el.water, "sparkle", 2600);
+    const top = parseFloat(el.water.style.top) || 570;
+    for (let i = 0; i < 6; i++) setTimeout(() => FX.sparkle(el.fx, 1250 + Math.random() * 330, top + 10 + Math.random() * 120, 10, 70), i * 260);
+  }
+
   /** Move the marker one level at a time. `zeroGlow`: 0 lights up as it is crossed. */
   async function animateTo(L, stepMs = 240, zeroGlow = false) {
     while (S.level !== L) {
@@ -1372,6 +1390,7 @@
     setMarkerEnabled(false);
     S.phase = "feedback";
     el.marker.classList.add("locked");                   // "Marker locks at +2."
+    lockBurst(q.target);
     if (q.eq) renderEq(q);                               // back to the full question "0 + 3 = ?" for the keypad step
     FX.flash(S.labels[q.target], "pulse", 2800);
     if (q.target === 0) { FX.flash(S.ticks[0], "pulse", 2800); FX.flash(S.tticks[0], "pulse", 2800); }   // "The 0 mark glows briefly."
@@ -1404,6 +1423,7 @@
       S.countFrom = q.start;
       await animateTo(q.target, 420);
       el.marker.classList.add("locked");
+      lockBurst(q.target);
     }
     if (q.eq) completeEq(q);                             // "Equation completes: 0 + 3 = +3."
     await succeed(q, p, "plate");
@@ -1444,6 +1464,7 @@
         S.countFrom = S.level; render();
         await demoDrag(step.to);
         el.marker.classList.add("locked");
+        lockBurst(step.to);
         FX.flash(S.labels[step.to], "pulse", 2800);      // highlighted level marks
         FX.sparkle(el.fx, LABEL_X, levelY(step.to), 10, 70);
         await FX.sleep(1200);
@@ -1542,6 +1563,7 @@
         FX.flash(el.marked, "show", 2300);
         FX.sfx("board"); FX.sfx("confetti");
         FX.confetti(el.confetti, { count: 180, x: 960, y: 420, power: 1.2, spread: 1.3 });
+        waterSparkle();
         break;
       }
       case "leverStuck":                                 // "Pari tries to use the lever, but it does not respond."
@@ -1966,7 +1988,8 @@
      Progress dots (one per question)
      ================================================================= */
   function buildProgress() {
-    el.progress.innerHTML = "";
+    el.progress.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="dropWater" x1="0" y1="0" x2="0" y2="1">` +
+      `<stop offset="0" stop-color="#8fe3ff"/><stop offset=".45" stop-color="#2fb0f5"/><stop offset="1" stop-color="#0d6fcf"/></linearGradient></defs></svg>`;
     let sec = null;
     DATA.steps.forEach((s) => {
       if (s.type !== "question") return;
@@ -1974,8 +1997,16 @@
       sec = s.section;
       const i = document.createElement("i");
       i.dataset.id = s.id;
+      i.innerHTML = dropSvg(el.progress.children.length);
       el.progress.appendChild(i);
     });
+  }
+  /** A drop for the progress bar: a white rim, and water that rises inside when it's done. */
+  const DROP = "M12 1C12 1 23 13.5 23 19.5A11 11 0 0 1 1 19.5C1 13.5 12 1 12 1Z";
+  function dropSvg(n) {
+    return `<svg viewBox="0 0 24 31" aria-hidden="true"><defs><clipPath id="drop${n}"><path d="${DROP}"/></clipPath></defs>` +
+      `<g clip-path="url(#drop${n})"><rect class="drop-bg" width="24" height="31"/><rect class="drop-fill" width="24" height="31"/></g>` +
+      `<path class="drop-rim" d="${DROP}"/></svg>`;
   }
   function markProgress(id, done) {
     el.progress.querySelectorAll("i").forEach((d) => {
@@ -2004,9 +2035,10 @@
     }
     // End
     focusOn(null);
+    el.endScreen.classList.remove("hidden");             // the cover art again, with the badge
+    el.confetti.style.zIndex = 96;                       // confetti over the end screen
     FX.confetti(el.confetti, { count: 260, x: 960, y: 420, power: 1.3, spread: 1.4 });
     FX.sfx("complete");
-    el.endScreen.classList.remove("hidden");
   }
 
   function init() {
@@ -2040,7 +2072,10 @@
       setTimeout(() => el.startScreen.classList.add("hidden"), 500);
       run();
     });
-    $("btnReplay").addEventListener("click", () => location.reload());
+    $("btnReplay").addEventListener("click", () => {      // play again from the cover, in the same language
+      const u = new URLSearchParams(location.search); u.delete("step");
+      location.search = u.toString() ? "?" + u : "";
+    });
     // The game pauses while the window isn't focused; say so instead of going silent
     window.addEventListener("fx:paused", () => el.paused.classList.remove("hidden"));
     window.addEventListener("fx:resumed", () => el.paused.classList.add("hidden"));

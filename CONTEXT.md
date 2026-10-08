@@ -95,6 +95,14 @@ Key positions (from Figma "Slide 16:9 - 16"):
 * **The art isn't for copying:** no text selection, no right-click menu, no image dragging, no copy or cut, and no "Save image" on a long press (`-webkit-touch-callout`). This stops casual copying. Anything a browser shows can still be saved with developer tools, which no web page can prevent.
 * **Sound only in the game's tab:** when the tab is hidden or the window loses focus, the voice, browser voice, sound effects and music all stop at once (`onPresence()` in `fx.js`; the music no longer fades on a timer that hidden tabs slow down). The current line starts again when the learner comes back. Closing or reloading the tab silences everything (`pagehide`).
 
+## 3c. Feedback and water polish (2026-10-08, no new assets)
+
+* **Lock moment** (`lockBurst()`): when the marker locks on an answer (the lever part, Level 3's automatic lever, the How to Play demo), two ripple rings spread over the water surface and the number on the scale pops.
+* **Progress drops:** one water drop per question (an inline SVG, `dropSvg()`). It fills from the bottom with water when the question is done, and the current one is lifted with a yellow rim.
+* **Level Complete** (`waterSparkle()`): the tank's water brightens, its light patterns speed up, and sparkles rise across it.
+* **Livelier water:** soft light patterns drift under the surface (`#water .caustics`, brightest near the top) and a glint runs along the surface (`.glint`). Both sit inside `#water`, so they move with the level. The inlet splash (ripples and droplets where the stream lands) was already there. All of it is still with reduced motion.
+* **End screen:** the cover art again, with the completion badge (a gold ★ disc), the title and a round ↻ button that reloads at the cover in the same language (`?step=` is dropped). Confetti is raised above it.
+
 ## 4. Game flow
 
 ```

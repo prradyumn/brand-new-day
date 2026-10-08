@@ -53,8 +53,10 @@
       <!-- ============ TANK + SCALE (right) ============ -->
       <img id="pipeIn" class="pipe" src="assets/pipe-in-dry.png" alt="" draggable="false" />
       <div id="water">
+        <div class="caustics" aria-hidden="true"></div>   <!-- light patterns drifting under the surface -->
         <div class="wave wave--back"></div>
         <div class="wave wave--front"></div>
+        <div class="glint" aria-hidden="true"></div>      <!-- a bright line running along the surface (moves with the level) -->
         <div class="bubbles"></div>
       </div>
       <!-- Pipe water (CSS + SVG; the pipe images never change): the inlet pours into
@@ -188,10 +190,14 @@
           <button id="btnStart" class="cover-btn" aria-label="Start"><i class="play" aria-hidden="true"></i><b data-i18n="start">Start</b></button>
         </div>
       </div>
-      <div id="endScreen" class="screen hidden">
-        <div class="card">
+      <!-- End: the cover art again, with the completion badge and a replay button -->
+      <div id="endScreen" class="cover end hidden">
+        <div class="cover-art" aria-hidden="true"></div>
+        <div class="cover-shine" aria-hidden="true"></div>
+        <div class="cover-title">
+          <div class="end-medal" aria-hidden="true"><span>★</span></div>
           <h1 data-i18n="title">Integers<br /><span>Rise and Fall</span></h1>
-          <button id="btnReplay" class="big-btn" aria-label="Play again">↻</button>
+          <button id="btnReplay" class="cover-btn round" aria-label="Play again"><span aria-hidden="true">↻</span></button>
         </div>
       </div>
 
