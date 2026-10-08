@@ -51,6 +51,7 @@ Script load order matters: `data.js` → `assets/vo/manifest.js` → `fx.js` →
   * The words pair up: बढ़ता है → जोड़ते हैं, घटता है → घटाते हैं.
   * The game's levels are "लेवल" and the water's level is "स्तर", so the two are never confused.
   * The learner is "तुम", with gender-neutral sentences.
+* **Pari's voice (2026-10-07):** Leda on Gemini 3.8 Flash with a stronger child brief ("a real young child's voice: high, light and bright, a little breathy, bubbly…") and her own director's notes (`NOTES_PARI`). It was picked by ear from 13 candidates: 5 voices on Flash and on Flash Lite, plus pitch-lifted Leda. Gemini has no true child voice; a real child's voice would need a consented recording plus voice conversion (Seed-VC) or cloning (IndicF5).
 * **Hindi voice:** recorded by `tools/generate-audio.mjs` together with English, using the same voices cast for natural Uttar Pradesh / Delhi Hindi (`VOICES_HI`, `NOTES_HI`, language `hi-IN`). Each take is transcribed in Devanagari and compared word by word, with spelling variants folded together. The manifest holds both languages, keyed by the line itself.
 * **Font:** Devanagari uses Baloo 2 (Google Fonts, after Nunito in the font stack).
 

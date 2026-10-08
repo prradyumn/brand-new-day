@@ -37,7 +37,8 @@ const LANGUAGE = "en-IN";
 /* Voice casting. `profile` goes into the prompt's AUDIO PROFILE. */
 const VOICES = {
   guddu:    { voice: "Puck", profile: "Guddu Bhaiya, a cheerful young Indian man in his twenties from a North Indian village, the kind older brother of the neighbourhood" },
-  pari:     { voice: "Leda", profile: "Pari, a curious and excited nine-year-old Indian girl from a North Indian village" },
+  // Pari: the child brief picked in the voice audition (2026-10-07: "Leda · Gemini 3.8 Flash")
+  pari:     { voice: "Leda", profile: "Pari, an eight-year-old Indian girl from a village in Uttar Pradesh. A real young child's voice: high, light and bright, a little breathy, bubbly and excited, with a child's quick, playful energy. Never an adult woman." },
   narrator: { voice: "Kore", profile: "An Indian storyteller narrator, calm and warm" }
 };
 const SCENE = "A sunny village in India. Beside the big village water tank, a friendly guide helps a young child learn about water levels and integers.";
@@ -50,7 +51,7 @@ const NOTES = [
 /* Hindi: the same voices, cast for natural, everyday Hindi */
 const VOICES_HI = {
   guddu:    "Guddu Bhaiya, a cheerful young Indian man in his twenties from a village in Uttar Pradesh, the kind older brother of the neighbourhood, speaking warm, natural, everyday Hindi",
-  pari:     "Pari, a curious and excited eight-year-old Indian girl from a village in Uttar Pradesh, speaking natural Hindi with a bright, young child's voice",
+  pari:     "Pari, an eight-year-old Indian girl from a village in Uttar Pradesh, speaking natural everyday Hindi. A real young child's voice: high, light and bright, a little breathy, bubbly and excited, with a child's quick, playful energy. Never an adult woman.",
   narrator: "An Indian storyteller narrator, calm and warm, speaking clear, natural Hindi"
 };
 const NOTES_HI = [
@@ -123,9 +124,15 @@ async function call(model, body, tries = 6) {
 }
 const audioPart = (d) => d.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
 
+/* Pari's own director's notes (the audition's): a child's delivery, not a narrator's */
+const NOTES_PARI = {
+  en: "Accent: natural Indian English, as a child from Uttar Pradesh speaks it.\nStyle: excited, cheerful, childlike.\nPacing: natural, lively.",
+  hi: "Language: natural, everyday spoken Hindi, exactly as a child from Uttar Pradesh talks. Pure Hindi pronunciation.\nRead the transcript exactly as written, word for word. Read the numbers in Hindi (2 = दो). 'धन' and 'ऋण' are maths words: say them clearly.\nStyle: excited, cheerful, childlike.\nPacing: natural, lively."
+};
 function ttsPrompt(speaker, text, lang) {
   const profile = lang === "hi" ? VOICES_HI[speaker] : VOICES[speaker].profile;
-  return `# AUDIO PROFILE: ${profile}\n\n## THE SCENE\n${SCENE}\n\n### DIRECTOR'S NOTES\n${lang === "hi" ? NOTES_HI : NOTES}\n\n#### TRANSCRIPT\n${text}`;
+  const notes = speaker === "pari" ? NOTES_PARI[lang === "hi" ? "hi" : "en"] : lang === "hi" ? NOTES_HI : NOTES;
+  return `# AUDIO PROFILE: ${profile}\n\n## THE SCENE\n${SCENE}\n\n### DIRECTOR'S NOTES\n${notes}\n\n#### TRANSCRIPT\n${text}`;
 }
 async function tts(speaker, text, lang) {
   const d = await call(TTS_MODEL, {
