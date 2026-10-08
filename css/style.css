@@ -692,7 +692,10 @@ button { font-family: inherit; cursor: pointer; }
   opacity: 0; transform: scale(.3); transition: opacity .3s, transform .5s var(--ease-spring);
 }
 #story .sign.plus { background: radial-gradient(circle at 35% 30%, #ffe27a, #f5b400 60%, #d68f00); }
-#story .sign.minus { background: radial-gradient(circle at 35% 30%, #8fd0ff, #2b8cf2 60%, #1466d4); }
+#story .sign.minus {        /* red like the ▼ button: it sits on blue water, so it must not be blue */
+  background: radial-gradient(circle at 35% 30%, #ff9a8a, #ec3b2b 58%, #b81d12);
+  box-shadow: 0 0 0 5px rgba(184, 29, 18, .35), 0 10px 26px rgba(0, 0, 0, .35);
+}
 #story .sign.on { opacity: 1; transform: scale(1); }
 /* Story scenes with an empty tank (p07e–p10e): water drawn between the scene art and
    the characters (cut out of the same art). Glass interior 852–1238 × 228–938 (stage px). */
