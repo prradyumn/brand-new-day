@@ -728,7 +728,7 @@ button { font-family: inherit; cursor: pointer; }
   text-shadow: 0 0 6px rgba(255, 255, 255, .9), 0 0 2px rgba(255, 255, 255, .9);
 }
 #story .chars { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
-#story .tank-off { display: none; }
+#story .shot .tank-off { display: none; }   /* more specific than `#story .shot img` (display: block), or a scene's character cut-out stays over the next scene */
 #story .lever {                      /* Story End row 4: a lever marker that slides along the scale */
   position: absolute; width: 120px; height: 46px; margin: -23px 0 0 -60px;
   filter: drop-shadow(0 0 10px rgba(255, 210, 40, .9)) drop-shadow(0 4px 4px rgba(0, 0, 0, .25));

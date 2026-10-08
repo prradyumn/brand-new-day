@@ -178,7 +178,7 @@ Story End scenes (`p11` and `p12` were made for the ending: sunny, the rain has 
   * **Layers**, bottom to top: scene art, the water layer (`.tank-fx`), then the characters (`chars-pXXe.png`, cut out of the same art with macOS Vision), so Guddu's pointing hand stays in front of the water. Glass interior: 852–1238 × 228–938; level 0 at y 570, 90 px per level (`ST_TANK`).
   * **Data:** a step's `tank: { from }` sets the starting level. Its `glow` then lists levels instead of [x, y]: the water rises or falls to each one before it lights. `tank: { from, to }` (ST9) moves the water to one level while the marks light.
   * **Pouring:** while the water rises, the top pipe pours (`.pour`, the same stream as the game's inlet), and the fill and drain sounds play.
-  * **Continuity:** p06 shows 0, then ST5 rises 0 → +3, ST6 falls to −3, ST7 rises to +3, ST8 falls to −3, ST9 returns to 0, and p04 shows 0 again.
+  * **Every scene starts at 0** (2026-10-08): ST5 and ST7 rise 0 → +3 ("above 0", "positive"), ST6 and ST8 fall 0 → −3 ("below 0", "negative"), and ST9 stays at 0 while both sides light. The water only ever moves through the numbers the line is about. Before, each scene carried on from the last, so "positive" began with the water at −3. The cross-fade between scenes hides the reset.
   * **Art fix:** ChatGPT left a stub of water under the top pipe in `p08`/`p10`. It's covered in the web copies with the same patch of sky from `p07e`.
 
 ### A question = up to two parts

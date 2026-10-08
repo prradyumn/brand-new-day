@@ -64,6 +64,8 @@ window.GAME_DATA = {
        glow:   level marks on the scene art that light up one by one, [x, y] in scene px
        sign:   a "+" / "−" badge (CSV visual assets "plus sign" / "minus sign")
        tank:   empty-tank scenes (scene-pXXe + chars-pXXe.png): the game draws the water and
+               (every one starts at 0, the reference level, so the water only moves through the
+               numbers the line is about: "above 0 … positive" rises 0 → +3, "below 0 …" falls 0 → −3)
                the scale. { from } = the water level at the start; it then rises/falls to each
                `glow` level (glow = levels, not [x, y]) before that mark lights, or with { to }
                it moves to that level while the marks light
@@ -93,25 +95,25 @@ window.GAME_DATA = {
       bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
       vo: "Above 0, there is more water than required.",
       ost: "Above 0, there is more water than requirement." },
-    { type: "scene", id: "ST6", section: "story", scene: "p08e", tank: { from: 3 },
+    { type: "scene", id: "ST6", section: "story", scene: "p08e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 are highlighted one by one. Camera moves downward.
       glow: [-1, -2, -3],                                                  // the water falls to each mark, then it lights
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
       vo: "Below 0, there is less water than required.",
       ost: "Below 0, there is less water than requirement." },
-    { type: "scene", id: "ST7", section: "story", scene: "p07e", tank: { from: -3 },
+    { type: "scene", id: "ST7", section: "story", scene: "p07e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 highlighted one by one, plus sign.
       glow: [1, 2, 3], sign: { text: "+", x: 1100, y: 395 },
       bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
       vo: "Now notice this, numbers above 0 are positive numbers.",
       ost: "Now notice this, numbers above 0 are positive numbers." },
-    { type: "scene", id: "ST8", section: "story", scene: "p09e", tank: { from: 3 },
+    { type: "scene", id: "ST8", section: "story", scene: "p09e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 highlighted one by one, minus sign.
       glow: [-1, -2, -3], sign: { text: "−", x: 1100, y: 745 },
       bubble: { shape: "wide", tail: "right", w: 500, tip: [530, 395] },
       vo: "And, numbers below 0 are negative numbers.",
       ost: "And, numbers below 0 are negative numbers." },
-    { type: "scene", id: "ST9", section: "story", speaker: "pari", scene: "p10e", tank: { from: -3, to: 0 },   // Full scale: negative numbers, 0, positive numbers. Pari responds.
+    { type: "scene", id: "ST9", section: "story", speaker: "pari", scene: "p10e", tank: { from: 0, to: 0 },   // Full scale: negative numbers, 0, positive numbers. Pari responds.
       glow: [-1, -2, -3, 0, 1, 2, 3],                                       // the water returns to 0 while the marks light
       bubble: { shape: "round", tail: "left", w: 560, tip: [1440, 470] },
       vo: "Oh! so, below 0 is negative, and above 0 is positive!",
