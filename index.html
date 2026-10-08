@@ -176,11 +176,15 @@
         <div class="flood-card"><h2></h2><button id="floodGo" class="big-btn" aria-label="Start">▶</button></div>
       </div>
 
-      <div id="startScreen" class="screen">
-        <div class="card">
+      <!-- Cover (Gemini "Nano Banana Pro" key art, assets/cover.jpg): the title on the open sky, Start below it -->
+      <div id="startScreen" class="cover">
+        <div class="cover-art" aria-hidden="true"></div>
+        <div class="cover-shine" aria-hidden="true"></div>
+        <div class="cover-bubbles" aria-hidden="true"></div>
+        <div class="cover-title">
           <h1 data-i18n="title">Integers<br /><span>Rise and Fall</span></h1>
           <div id="qaStartTag" class="hidden"></div>
-          <button id="btnStart" class="big-btn" aria-label="Play">▶</button>
+          <button id="btnStart" class="cover-btn" aria-label="Start"><i class="play" aria-hidden="true"></i><b data-i18n="start">Start</b></button>
         </div>
       </div>
       <div id="endScreen" class="screen hidden">

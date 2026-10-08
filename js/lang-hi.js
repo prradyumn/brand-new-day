@@ -25,6 +25,7 @@
     html: {
       title: "पूर्णांक<br /><span>उतार और चढ़ाव</span>",
       check: "जाँचो",
+      start: "शुरू करो",
       langBtn: "English"                     // the button offers the other language
     },
 

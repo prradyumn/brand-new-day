@@ -956,6 +956,27 @@
     if (S.phase !== "entry") return;
     resetIdle();
     applyKey(k);
+    previewEntry();
+  }
+  /* Level 3 (autoLever): the lever and the water follow what the learner types, so the
+     answer shows on the tank before Check. "+7" → the water rises to +7. Until there is a
+     sign and a number ("+", "7", or nothing) it rests at the question's start level. */
+  let previewGen = 0;
+  function typedLevel() {
+    const m = /^([+-])?(\d+)$/.exec(S.entry);
+    if (!m) return null;
+    const v = (m[1] === "-" ? -1 : 1) * parseInt(m[2], 10);
+    if (v !== 0 && !m[1]) return null;                   // sign first: no sign yet, no level yet
+    return Math.max(CFG.levelMin, Math.min(CFG.levelMax, v));
+  }
+  async function previewEntry() {
+    if (!S.q || !S.q.autoLever || S.phase !== "entry") return;
+    const L = typedLevel(), to = L === null ? S.q.start : L;
+    const my = ++previewGen;
+    while (S.level !== to && my === previewGen) {
+      setLevel(S.level + Math.sign(to - S.level));     // level by level, with the water and its sound
+      await FX.sleep(150);
+    }
   }
   function applyKey(k) {
     FX.sfx("key");
@@ -975,6 +996,7 @@
     FX.sfx("key", 0.8);
     S.entry = S.entry.slice(0, -1);
     entryDisplay();
+    previewEntry();
   }
   function checkEntry() {
     if (S.phase !== "entry") return;
@@ -999,6 +1021,7 @@
     FX.badge(el.fx, pp.x + 250, pp.y, false);                     // ✗ on the display's right edge
     S.entry = "";
     entryDisplay();
+    if (q.autoLever) { previewGen++; await animateTo(q.start, 150); }   // Level 3: the water slides back to the start
     if (!p.wrong) { resetIdle(); return; }
     S.phase = "feedback";
     stopIdle();
@@ -1318,9 +1341,11 @@
     focusOn("pad");
     await FX.sleep(400);
     S.phase = "entry";
+    if (q.autoLever) { S.countFrom = q.start; render(); }    // the dashed line shows how far the typed answer is from the start
     resetIdle();
     await new Promise((r) => (S.resolveEntry = r));
     S.resolveEntry = null;
+    previewGen++;                                         // the answer is in: no more preview steps
     stopIdle();
     S.phase = "feedback";
     setPlate(fmt(q.target), true);                       // "+2 appears on the display (and glows briefly)."
@@ -1940,6 +1965,7 @@
     buildScale();
     buildBubbles();
     buildBubbles(el.flood.querySelector(".bubbles"), 34, 1880);
+    buildBubbles(document.querySelector(".cover-bubbles"), 14, 300);   // bubbles rising in the cover's tank
     requestAnimationFrame(lipLoop);                  // the characters' mouths follow the voice
     buildProgress();
     // Start state for the first step played (the first step, or the QA jump target)
@@ -1985,7 +2011,8 @@
     "asset_speech_bubble_blank", "asset_p09_overlay_6218b7e3"].map((n) => `assets/${n}.png`)
     .concat([...new Set(DATA.steps.filter((s) => s.scene).map((s) => `assets/story/scene-${s.scene}.jpg`))])
     .concat(DATA.steps.filter((s) => s.tank).map((s) => `assets/story/chars-${s.scene}.png`))
-    .concat([...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src));
+    .concat([...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src))
+    .concat(["assets/cover.jpg"]);
   Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; })))
     .then(init);
   fitStage();

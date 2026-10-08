@@ -78,6 +78,15 @@ Key positions (from Figma "Slide 16:9 - 16"):
 | Marker (yellow arrow) | Line 13 | x 1128, 140 wide |
 | Scale | Frame 3 / Frame 4 | level 0 at **y = 570**, **75 px per level** |
 
+## 3b. Cover (start screen)
+
+* **The art:** `assets/cover.jpg` (1920×1080 web copy; the 2752×1536 source is `assets/cover_source.jpg`, kept out of the Vercel upload). It was made with Gemini "Nano Banana Pro" (`gemini-3-pro-image`) on 2026-10-08, using scenes p12, p11 and p04 as style and character references, and chosen from three takes. The image has no text in it. Guddu points down and Pari points up (rise and fall), and the left third is open sky for the title.
+* **The page** (`#startScreen.cover`, built in HTML/CSS on top of the art, so it stays sharp and switches language):
+  * The title is the existing `data-i18n="title"` (पूर्णांक / उतार और चढ़ाव in Hindi), on a soft light veil.
+  * The Start button is the game's glossy green, with a play disc; its label is the CSV's "Start" (`data-i18n="start"`, शुरू करो).
+  * Motion: a slow drift on the art, sun rays, bubbles rising in the tank, and a gentle pulse and light sweep on the button. All of it is off with reduced motion.
+* **Testing note:** the button never stops pulsing, so automated clicks need `{ force: true }`.
+
 ## 3a. Screens, copying and sound outside the tab
 
 * **Every screen size:** the 1920×1080 stage scales to fit and is letterboxed (`fitStage()`). It refits on resize, on rotation and when a phone's URL bar shows or hides (`visualViewport`). Pointer input is converted back to stage pixels, so dragging works at any size. Tested at 390×844, 844×390, 820×1180, 1366×768, 900×900 and 2560×1080.
@@ -186,7 +195,7 @@ Story End scenes (`p11` and `p12` were made for the ending: sunny, the rain has 
 Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong[3]`, `idle`, `success`.
 
 1. **Lever part** (`leverPart()`): the VO plays, the OST stays in the banner, the learner drags the marker or taps ▲/▼. When the marker has rested `settleMs` (1.3 s) it is checked: at the target → correct; still at the start → ignored; anywhere else → a wrong attempt. Correct: "Marker locks", small ✓ + sparkle, and the correct line ("Correct! You reached +2.").
-2. **Entry part** (`entryPart()`): the VO ("Enter the new water level."), then the learner types sign + digits and presses **Check**. Correct: the value appears on the display and glows, the equation completes, "✓ Sparkle + Water Level Marked!" (board + confetti; the Level 1 tutorial gets only ✓ + sparkle), then the correct line. Level 3 (`autoLever`) has only this part; after the answer the lever moves by itself, level by level, and the water follows.
+2. **Entry part** (`entryPart()`): the VO ("Enter the new water level."), then the learner types sign + digits and presses **Check**. Correct: the value appears on the display and glows, the equation completes, "✓ Sparkle + Water Level Marked!" (board + confetti; the Level 1 tutorial gets only ✓ + sparkle), then the correct line. Level 3 (`autoLever`) has only this part. **The lever and water follow what the learner types** (`previewEntry()`, 2026-10-08): "+" then "7" slides them level by level to +7, with the water sound and the dashed count line from the start level. A sign alone, a number without its sign, ⌫ back to empty or a wrong Check slides them back to the start level. A correct Check locks them where they are.
 
 **The equation builds in step with the voice-over** (`buildTeachEq()`, `buildQuestionEq()`, `untilWord()` in `game.js`).
 * Equation pieces wait hidden (`.eqhide` keeps their space, so nothing shifts) and pop in (`.eqpop`) on their word.

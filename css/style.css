@@ -544,6 +544,84 @@ button { font-family: inherit; cursor: pointer; }
   transition: opacity .5s;
 }
 .screen.fade { opacity: 0; pointer-events: none; }
+
+/* ---------------- Cover (start screen) ----------------
+   Full-bleed key art; the title sits on the calm sky on the left, with the Start button under
+   it. A slow drift on the art, light rays and bubbles rising out of the tank keep it alive. */
+.cover { inset: 0; width: 1920px; height: 1080px; z-index: 90; overflow: hidden; background: #8fc8ef; transition: opacity .6s, transform .6s; }
+.cover.fade { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.cover-art {
+  position: absolute; inset: -2%; background: url(../assets/cover.jpg) center / cover no-repeat;
+  animation: coverDrift 22s ease-in-out infinite alternate;
+}
+.cover-art::after {        /* a soft light veil behind the title, so it reads on the sky */
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(60% 75% at 18% 42%, rgba(255, 252, 238, .72), rgba(255, 252, 238, .25) 55%, rgba(255, 252, 238, 0) 80%);
+}
+.cover-shine {             /* sun rays from the top left */
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: .55;
+  background: repeating-conic-gradient(from 200deg at -4% -8%, rgba(255, 244, 200, .28) 0 3deg, rgba(255, 244, 200, 0) 3deg 9deg);
+  -webkit-mask-image: radial-gradient(90% 90% at 0 0, #000 20%, transparent 70%); mask-image: radial-gradient(90% 90% at 0 0, #000 20%, transparent 70%);
+  animation: coverRays 9s ease-in-out infinite alternate;
+}
+.cover-bubbles { position: absolute; left: 1150px; top: 330px; width: 380px; height: 640px; pointer-events: none; }
+.cover-bubbles span {
+  position: absolute; bottom: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.95), rgba(255,255,255,.25) 45%, rgba(255,255,255,.05) 70%);
+  border: 1.5px solid rgba(255,255,255,.7); animation: coverBubble linear infinite;
+}
+.cover-title {
+  position: absolute; left: 110px; top: 190px; width: 760px;
+  display: grid; justify-items: center; gap: 30px; text-align: center;
+}
+.cover-title h1 {
+  margin: 0; font-family: "Baloo 2", "Nunito", system-ui, sans-serif; font-weight: 800;
+  font-size: 150px; line-height: .92; letter-spacing: -.01em; color: #0d3b8c;
+  -webkit-text-stroke: 10px #fff; paint-order: stroke fill;
+  text-shadow: 0 10px 0 rgba(13, 59, 140, .18), 0 18px 34px rgba(13, 40, 90, .25);
+  animation: coverIn .9s var(--ease-spring) both;
+}
+.cover-title h1 span {
+  display: inline-block; margin-top: 10px; font-size: 104px; color: #ff8a00;
+  -webkit-text-stroke: 9px #fff; text-shadow: 0 8px 0 rgba(180, 80, 0, .22), 0 16px 30px rgba(90, 40, 0, .22);
+}
+:lang(hi) .cover-title h1 { font-size: 136px; line-height: 1.12; }
+:lang(hi) .cover-title h1 span { font-size: 96px; }
+.cover-btn {               /* the game's glossy green, as a big pill with a play disc */
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 22px;
+  height: 128px; padding: 0 64px 0 22px; border-radius: 70px; border: 6px solid #fff; cursor: pointer;
+  font: 800 66px/1 "Baloo 2", "Nunito", system-ui, sans-serif; color: #fff; letter-spacing: .01em;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.45) 0 22%, rgba(255,255,255,0) 52%),
+    linear-gradient(180deg, #8ae65a 0%, #3fbf2f 55%, #1f9a1c 100%);
+  box-shadow: inset 0 -9px 0 rgba(0, 80, 0, .3), 0 9px 0 #146b12, 0 22px 40px rgba(10, 60, 20, .35), 0 0 0 10px rgba(255, 255, 255, .35);
+  text-shadow: 0 4px 0 rgba(0, 80, 0, .45);
+  animation: coverIn .9s .2s var(--ease-spring) both, coverPulse 2.4s 1.4s ease-in-out infinite;
+  transition: transform .12s;
+}
+.cover-btn .play {
+  width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: #fff; box-shadow: inset 0 -5px 0 rgba(20, 110, 20, .18);
+}
+.cover-btn .play::before {
+  content: ""; margin-left: 8px; border-left: 34px solid #2aa81f; border-top: 21px solid transparent; border-bottom: 21px solid transparent;
+}
+.cover-btn::after {        /* a light sweep across the button */
+  content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%;
+  background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,.55), rgba(255,255,255,0));
+  transform: skewX(-18deg); animation: coverSweep 3.2s 1.8s ease-in-out infinite;
+}
+.cover-btn:hover { filter: brightness(1.06); }
+.cover-btn:active { transform: translateY(6px); box-shadow: inset 0 -5px 0 rgba(0, 80, 0, .3), 0 3px 0 #146b12, 0 10px 20px rgba(10, 60, 20, .3), 0 0 0 10px rgba(255, 255, 255, .35); }
+.cover-btn:focus-visible { outline: 6px solid #ffd21a; outline-offset: 6px; }
+.cover #qaStartTag { margin: -10px 0 0; }
+@keyframes coverDrift { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.05) translate(-1.2%, -1%); } }
+@keyframes coverRays { from { opacity: .35; } to { opacity: .65; } }
+@keyframes coverBubble { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-560px); opacity: 0; } }
+@keyframes coverIn { from { opacity: 0; transform: translateY(40px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes coverPulse { 0%, 100% { scale: 1; } 50% { scale: 1.045; } }
+@keyframes coverSweep { 0%, 55% { left: -40%; } 100% { left: 120%; } }
+@media (prefers-reduced-motion: reduce) { .cover-art, .cover-shine, .cover-btn, .cover-btn::after, .cover-bubbles span, .cover-title h1 { animation: none !important; } }
 .card {
   width: 980px; padding: 40px 60px 70px; text-align: center;
   padding: 110px 110px 120px;
