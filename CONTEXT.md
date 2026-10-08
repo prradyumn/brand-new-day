@@ -78,13 +78,21 @@ Key positions (from Figma "Slide 16:9 - 16"):
 | Marker (yellow arrow) | Line 13 | x 1128, 140 wide |
 | Scale | Frame 3 / Frame 4 | level 0 at **y = 570**, **75 px per level** |
 
+## 3a. Screens, copying and sound outside the tab
+
+* **Every screen size:** the 1920×1080 stage scales to fit and is letterboxed (`fitStage()`). It refits on resize, on rotation and when a phone's URL bar shows or hides (`visualViewport`). Pointer input is converted back to stage pixels, so dragging works at any size. Tested at 390×844, 844×390, 820×1180, 1366×768, 900×900 and 2560×1080.
+* **Phone held upright** (portrait, under 700 px wide): a "turn your phone" card covers the game (`#rotate`, an animated phone icon with no text, under the content rule). Tablets held upright play letterboxed.
+* **No zoom or pull-to-refresh:** `touch-action: none`, `overscroll-behavior: none` and `user-scalable=no`. The QA jumper list is the only part that scrolls by touch.
+* **The art isn't for copying:** no text selection, no right-click menu, no image dragging, no copy or cut, and no "Save image" on a long press (`-webkit-touch-callout`). This stops casual copying. Anything a browser shows can still be saved with developer tools, which no web page can prevent.
+* **Sound only in the game's tab:** when the tab is hidden or the window loses focus, the voice, browser voice, sound effects and music all stop at once (`onPresence()` in `fx.js`; the music no longer fades on a timer that hidden tabs slow down). The current line starts again when the learner comes back. Closing or reloading the tab silences everything (`pagehide`).
+
 ## 4. Game flow
 
 ```
 Start screen (▶ = user gesture, unlocks speech; the first story scene sits behind it)
   Story        ST1–ST10  full-screen scenes (CSV Intro, Teaching, Game start), speech bubbles + VO
   ── chapter break: the screen floods, "How to Play" card, tap ▶, the water drains ──
-  How to Play  H1–H5  guided demo (blur + spotlight + hand): ▲/▼ taps, drag to +4, type 4, pick +, Check
+  How to Play  H1–H5  guided demo (blur + spotlight + hand): ▲/▼ taps, drag to +4, pick + then type 4 (sign first), Check
   ── dive ──
   Level 1      L1T    tutorial, learner plays (blur + spotlight): +2 → 0, then enter 0
                TR1    "Start" button → tank scale and dial become active
@@ -296,7 +304,7 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 
 ## 10. Known decisions / open points
 
-* **How to Play example numbers.** The "Game start" row says the lever is above 0, so the demo starts at +2. Step 1 taps ▲ then ▼ ("up or down as necessary"). Its example, "Like water rises 2 levels up", is played in step 2: the lever is dragged +2 → +4. Then the demo types 4 then + (the CSV introduces the number in step 3 and the sign in step 4) and presses Check. Change them in `data.js` (H1–H4).
+* **How to Play example numbers.** The "Game start" row says the lever is above 0, so the demo starts at +2. Step 1 taps ▲ then ▼ ("up or down as necessary"). Its example, "Like water rises 2 levels up", is played in step 2: the lever is dragged +2 → +4. Then the demo picks + and types 4, and presses Check. **Sign first, then the number** (a teaching choice, 2026-10-08): the CSV has the number in step 3 and the sign in step 4, but the game swaps them. Step 1 is spoken by Guddu, not the Narrator as in the CSV, so a face is in the narrator box from the first line and one host presents all of How to Play. Change them in `data.js` (H1–H4).
 * The Level 1 tutorial marker starts at +2 ("starts above 0").
 * **The equation panel only ever shows equations.** In the Level 2 teaching rows, the example equations ("1 + 2 = ?", "3 − 5 = −2", `ostIn: "eq"`) go in the panel, written as the CSV writes them. The word captions ("Water level rises → Add", "Rise → Add • Go down → Subtract") are shown in the narrator box after the line, like every other OST. Each piece of the equation sits on its own card in the cream strip, following the reference mock (`screen-mock-01.png`): white number cards, smaller cream cards for the signs, and a light-blue answer card with a blue outline. Card sizes are in `em`, so `fitEq()` shrinks the cards along with the font when an equation would overflow the strip. Only the widest one does: "(−2) + (−3) = ?" goes from 46 to 44 px.
 * Fixed CSV typos: "thje" → "the" (Level 2 example 2), "2 level up" → "2 levels up" (How to Play step 1), stray closing quotes in OSTs, and missing full stops at the end of the story lines and How to Play step 1. Everything else is word for word, including where VO and OST differ: Story rows "than required" / "than requirement", Level 2 example 3, Story End rows 4 and 5 (VO "Integers Expert", OST "Water Level Expert").

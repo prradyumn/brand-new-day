@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Integers: Rise and Fall</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -190,6 +192,9 @@
 
     </div>
   </div>
+
+  <!-- Phone held upright: the 16:9 game would be a thin strip, so ask to turn it (icon only) -->
+  <div id="rotate" role="img" aria-label="Turn your phone sideways"><div class="phone"></div></div>
 
   <!-- Level transition: underwater layer (outside the stage so it doesn't zoom with the camera) -->
   <div id="under" class="hidden" aria-hidden="true"><div class="rays"></div><div class="bubbles"></div></div>

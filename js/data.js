@@ -124,7 +124,9 @@ window.GAME_DATA = {
 
     /* ======================= HOW TO PLAY (guided demo) ======================= */
     {
-      type: "demo", id: "H1", section: "howto", guided: true, speaker: "narrator",
+      // The CSV gives this line to the Narrator; Guddu says it (2026-10-08) so a face is in the
+      // narrator box from the first line and one host presents all of How to Play.
+      type: "demo", id: "H1", section: "howto", guided: true, pose: "point",
       act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0. The "2 levels up" example is shown in H2 (+2 → +4)
       vo: "Move the lever up or down as necessary. Like water rises 2 levels up.",
       ost: "Move the lever up or down.\nMove the lever 2 levels up."
@@ -135,17 +137,19 @@ window.GAME_DATA = {
       vo: "Mark the correct water level.",
       ost: "Mark the correct water level."
     },
+    // Sign first, then the number (2026-10-08, a teaching choice): the CSV's How to Play rows 3–4
+    // are the other way round. "+" then "4" reads as the level +4.
     {
       type: "demo", id: "H3", section: "howto", guided: true,
-      act: "enterNumber", key: "4", pose: "point",      // "Camera shifts to the dial and display screen."
-      vo: "Now enter the new water level.",
-      ost: "Now, enter the new water level."
+      act: "chooseSign", key: "+", pose: "point",       // Camera shifts to the dial and display. "Plus and minus sign buttons are highlighted."
+      vo: "Choose the correct sign for the water level.",
+      ost: "Choose the correct sign."
     },
     {
       type: "demo", id: "H4", section: "howto", guided: true,
-      act: "chooseSign", key: "+", pose: "point",       // "Plus and minus sign buttons are highlighted beside the number buttons."
-      vo: "Choose the correct sign for the water level.",
-      ost: "Choose the correct sign."
+      act: "enterNumber", key: "4", pose: "point",      // the number buttons
+      vo: "Now enter the new water level.",
+      ost: "Now, enter the new water level."
     },
     {
       type: "demo", id: "H5", section: "howto", guided: true,

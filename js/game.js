@@ -118,6 +118,12 @@
   };
 
   window.__GAME_STATE = S; // exposed for debugging / automated tests
+  // the web fonts change text widths once they arrive: fit the equation and the narrator box again
+  if (document.fonts) {
+    const refit = () => { fitEq(); fitText(el.bannerText, el.bannerText.textContent.length > 70 ? 28 : 32); };
+    document.fonts.ready.then(refit);
+    document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", refit);
+  }
 
   // QA: ?step=ID starts the game at that step (see the level jumper below)
   const START_ID = new URLSearchParams(location.search).get("step");
@@ -163,6 +169,11 @@
   /** On-screen px per stage px, measured (the same for zoom and transform). */
   const stageK = (r) => r.width / 1920 || S.scale;
   window.addEventListener("resize", fitStage);
+  window.addEventListener("orientationchange", () => setTimeout(fitStage, 250));
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fitStage);   // phones: the URL bar showing / hiding
+  // The game's art and text are not for copying: no right-click menu, no dragging, no selection
+  ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach((ev) =>
+    document.addEventListener(ev, (e) => { if (!(e.target.closest && e.target.closest("input, textarea"))) e.preventDefault(); }));
   // Older browsers without `overflow: clip`: never let the stage scroll itself
   el.stage.addEventListener("scroll", () => { el.stage.scrollTop = 0; el.stage.scrollLeft = 0; });
 
@@ -440,6 +451,7 @@
   function setBanner(text, mood) {
     el.bannerText.textContent = text;
     el.bannerText.classList.toggle("long", text.length > 70);
+    fitText(el.bannerText, text.length > 70 ? 28 : 32);     // long lines (and Hindi) never spill out of the box
     setAvatar(mood);
     FX.flash(el.banner, "speak", 400);
   }
@@ -840,16 +852,32 @@
     fitEq();
   }
   /** Keep the equation inside the strip: shrink the font only if it would overflow. */
+  /** Keep the equation cards inside the strip's cream area, in width and height: shrink the
+      font (the cards are sized in em, so they shrink with it). Runs on every change and again
+      when the web fonts arrive (measured with a fallback font, the line would be too narrow). */
   function fitEq() {
     const p = el.eqPanel;
     p.style.fontSize = "";
     if (p.classList.contains("hidden")) return;
+    const cs = getComputedStyle(p);
+    const gap = parseFloat(cs.columnGap) || 0;
+    const roomW = p.clientWidth - 44, roomH = p.clientHeight - 8;    // clear of the strip's gold rim (it is thicker at the sides)
     // centred flex content overflows on both sides, so add up the parts (layout px, unaffected by the stage scale)
     const parts = [...p.children].filter((n) => n.offsetWidth > 0);
-    const gap = parseFloat(getComputedStyle(p).columnGap) || 0;
-    const need = parts.reduce((w, n) => w + n.offsetWidth, 0) + gap * (parts.length - 1);
-    const room = p.clientWidth - 16;                                  // a little air inside the strip
-    if (need > room) p.style.fontSize = Math.floor(parseFloat(getComputedStyle(p).fontSize) * room / need) + "px";
+    let fs = parseFloat(cs.fontSize);
+    for (let i = 0; i < 16; i++) {
+      const w = parts.reduce((sum, n) => sum + n.offsetWidth, 0) + gap * (parts.length - 1);
+      const h = Math.max(0, ...parts.map((n) => n.offsetHeight));
+      if (w <= roomW && h <= roomH) break;
+      fs = Math.max(18, Math.floor(fs * Math.min(1, roomW / w, roomH / h)) - (i ? 1 : 0));
+      p.style.fontSize = fs + "px";
+    }
+  }
+  /** Shrink a text box's font until its text fits (the box keeps its size). */
+  function fitText(node, max, min = 18) {
+    node.style.fontSize = max + "px";
+    for (let fs = max; fs > min && (node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1); fs--)
+      node.style.fontSize = fs - 1 + "px";
   }
   /* Building the equation in step with the voice-over: pieces start hidden
      (.eqhide keeps their space, so nothing shifts) and pop in on their word. */
@@ -1313,8 +1341,8 @@
     S.q = null; S.part = null;
     S.guided = !!step.guided;
     if (step.start != null && S.level !== step.start) jumpTo(step.start);
-    if (step.act === "enterNumber") {                    // "Camera shifts to the dial and display screen."
-      S.entry = ""; entryDisplay();
+    if ((step.act === "chooseSign" || step.act === "enterNumber") && el.panel.classList.contains("hidden")) {
+      S.entry = ""; entryDisplay();                      // "Camera shifts to the dial and display screen." (the first keypad step)
       showPlate(); showPanel();
     }
     // the line is about the lever (H1, H2) or the dial (H3, H4): keep that lit while it plays
@@ -1358,9 +1386,8 @@
         [keyNode("+"), keyNode("-")].forEach((k) => FX.flash(k, "keypulse", 2800));
         await FX.sleep(1400);
         await handTap(keyNode(step.key));
-        applyKey(step.key);
+        applyKey(step.key);                              // the sign first: the display shows "+", then the number follows
         await FX.sleep(600);
-        handHide();
         break;
       case "check": {                                    // "Check icon glows. The entered number matches the lever position."
         focusOn("pad");
@@ -1851,7 +1878,7 @@
     if (!START_INDEX) return;
     const before = DATA.steps.slice(0, START_INDEX);
     const at = DATA.steps[START_INDEX];
-    if (before.some((s) => s.act === "enterNumber")) {
+    if (before.some((s) => s.act === "enterNumber" || s.act === "chooseSign")) {
       [el.panel, el.plate, el.connector].forEach((n) => n.classList.remove("hidden"));
     }
     if (["level2", "level3", "end"].includes(at.section)) setMode("lvl");   // Level 2 on: keypad in level mode
@@ -1908,6 +1935,7 @@
   }
 
   function init() {
+    window.__GAME_DEBUG = { renderEq, showTeachEq, fitEq, setBanner, el };   // automated layout checks (QA)
     fitStage();
     buildScale();
     buildBubbles();
