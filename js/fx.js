@@ -345,7 +345,7 @@
     if (isAway()) {                               // left the tab or window: silent at once (a hidden tab slows the fade timer)
       clearInterval(music.fade); a.volume = 0; a.pause(); return;
     }
-    const target = !music.on || FX.muted ? 0 : music.base * (music.ducked ? 0.45 : 1);
+    const target = !music.on || FX.muted ? 0 : music.base * (music.ducked ? 0.4 : 1);   // under a line: about 25 dB below the voice
     if (target > 0 && a.paused) a.play().catch(() => {});
     clearInterval(music.fade);
     const from = a.volume, t0 = performance.now(), ms = target > from ? 900 : 350;

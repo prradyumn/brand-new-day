@@ -131,7 +131,7 @@
 
   FX.lang = CFG.speechLang;
   FX.loadSfx({ fill: "assets/sfx/water-fill.mp3", drain: "assets/sfx/water-drain.mp3" });
-  FX.loadMusic("assets/music/bg-loop.mp3", 0.7);   // Lyria 3 instrumental loop (tools/generate-audio.mjs --music)
+  FX.loadMusic("assets/music/bg-loop.mp3", 0.7);   // Lyria 3 instrumental loop, mixed at −30 LUFS (voice −16): ~17 dB under the voice between lines
   // One-shots (Mixkit free licence, trimmed so each starts on its first sound — see CONTEXT.md §7)
   FX.loadShots({
     key:      { url: "assets/sfx/key.wav",      vol: 0.55, pool: 4 },  // keypad digits, ±, ⌫

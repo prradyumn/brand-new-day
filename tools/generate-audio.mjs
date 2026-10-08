@@ -284,7 +284,7 @@ async function makeMusic() {
     `[0:a]atrim=${start}:${end},asetpts=PTS-STARTPTS,asplit=3[a][b][c];` +
     `[a]atrim=${X}:${L - X},asetpts=PTS-STARTPTS[body];[b]atrim=${L - X}:${L},asetpts=PTS-STARTPTS[tail];` +
     `[c]atrim=0:${X},asetpts=PTS-STARTPTS[head];[tail][head]acrossfade=d=${X}:c1=tri:c2=tri[seam];` +
-    `[body][seam]concat=n=2:v=0:a=1,loudnorm=I=-24:TP=-3:LRA=11[out]`,
+    `[body][seam]concat=n=2:v=0:a=1,loudnorm=I=-30:TP=-9:LRA=11[out]`,
     "-map", "[out]", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", path.join(ROOT, "assets/music/bg-loop.mp3")]);
   fs.unlinkSync(raw);
   console.log("  music: assets/music/bg-loop.mp3");
