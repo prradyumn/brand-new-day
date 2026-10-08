@@ -502,7 +502,16 @@ button { font-family: inherit; cursor: pointer; }
   opacity: 0; pointer-events: none;
   transition: opacity .45s ease, clip-path .65s var(--ease-out);
 }
-#focus.on { opacity: 1; pointer-events: auto; }
+#focus.on { opacity: 1; }
+/* The spotlight is a feathered mask (game.js softHole): the blur fades into the sharp area
+   instead of ending in a hard-edged rectangle. Hit-testing ignores masks, so #focusHit (same
+   holes, hard clip-path, invisible) is what stops taps outside the spotlight. */
+#focus {
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  transition: opacity .45s ease;   /* the holes themselves are animated by game.js (CSS mask transitions don't always settle) */
+}
+#focusHit { inset: 0; width: 1920px; height: 1080px; z-index: 40; pointer-events: none; }
+#focusHit.on { pointer-events: auto; }
 .focus-ring {
   /* No hard outline: a soft warm halo that "breathes", plus a one-off light
      sweep across the spotlight whenever the focus moves (class .sweep). */

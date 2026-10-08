@@ -75,7 +75,7 @@
 
   /* ---------------- DOM ---------------- */
   const el = {
-    stage: $("stage"), focus: $("focus"), ring0: $("ring0"), ring1: $("ring1"), ring2: $("ring2"),
+    stage: $("stage"), focus: $("focus"), focusHit: $("focusHit"), ring0: $("ring0"), ring1: $("ring1"), ring2: $("ring2"),
     banner: $("banner"), bannerText: $("bannerText"), avatar: $("avatar"), character: $("character"),
     plate: $("plate"), plateText: $("plateText"), connector: $("connector"),
     panel: $("panel"),
@@ -356,12 +356,59 @@
     ring.style.width = h.w + "px"; ring.style.height = h.h + "px";
     ring.classList.toggle("on", !!show);
   }
+  /* Feathered spotlight: each hole is a soft rounded rectangle (an SVG with a blurred rect,
+     made once per hole size) that is cut out of a full-cover mask. `grow` lets the soft edge
+     fade outside what must stay sharp. Shut = zero size at the hole's centre, so the
+     spotlight still grows out of and shrinks into its own place (mask-size / -position animate). */
+  const FEATHER = 46;
+  const softImg = {};
+  function softHole(h, open, grow = 22) {
+    const W = h.w + 2 * (grow + FEATHER), H = h.h + 2 * (grow + FEATHER), key = W + "x" + H;
+    if (!softImg[key]) {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}' viewBox='0 0 ${W} ${H}' preserveAspectRatio='none'>` +
+        `<filter id='f' x='-10%' y='-10%' width='120%' height='120%'><feGaussianBlur stdDeviation='${FEATHER / 3}'/></filter>` +
+        `<rect x='${FEATHER}' y='${FEATHER}' width='${h.w + 2 * grow}' height='${h.h + 2 * grow}' rx='40' fill='black' filter='url(#f)'/></svg>`;
+      softImg[key] = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    }
+    const x = h.x - grow - FEATHER, y = h.y - grow - FEATHER;
+    return open ? { img: softImg[key], r: [x, y, W, H] } : { img: softImg[key], r: [x + W / 2, y + H / 2, 0, 0] };
+  }
+  /* Show the holes, growing / shrinking from where they are to where they go over 0.65 s. */
+  let maskNow = null, maskAnim = 0;
+  function setFocusMask(holes, instant = false) {
+    const f = el.focus.style, all = ["linear-gradient(#000, #000)", ...holes.map((m) => m.img)].join(", ");
+    // the full cover minus the union of the holes: top layer "subtract" over the holes "add"-ed together
+    if (f.maskImage !== all) {
+      f.maskImage = all; f.webkitMaskImage = all;
+      const comp = ["subtract", ...holes.map(() => "add")].join(", "), wcomp = ["source-out", ...holes.map(() => "source-over")].join(", ");
+      f.maskComposite = comp; f.webkitMaskComposite = wcomp;
+    }
+    const to = holes.map((m) => m.r), from = maskNow && maskNow.length === to.length ? maskNow : to;
+    const paint = (rs) => {
+      const pos = ["0 0", ...rs.map((r) => `${r[0].toFixed(1)}px ${r[1].toFixed(1)}px`)].join(", ");
+      const size = ["100% 100%", ...rs.map((r) => `${r[2].toFixed(1)}px ${r[3].toFixed(1)}px`)].join(", ");
+      f.maskPosition = pos; f.webkitMaskPosition = pos; f.maskSize = size; f.webkitMaskSize = size;
+      maskNow = rs;
+    };
+    const my = ++maskAnim;
+    if (instant || REDUCED || from === to) { paint(to); return; }
+    const t0 = performance.now(), ms = 650;
+    const tick = (now) => {
+      if (my !== maskAnim) return;                       // a newer focus change took over
+      const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);   // ease-out
+      paint(to.map((r, i) => r.map((v, j) => from[i][j] + (v - from[i][j]) * e)));
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   function focusOn(key) {
     if (key && !S.guided) key = null;   // the spotlight is only used in guided steps
     if (!key) {
       S.focusKey = null; S.focusOpen = null;
       el.stage.classList.remove("lever-lit");
-      el.focus.classList.remove("on");
+      el.focus.classList.remove("on"); el.focusHit.classList.remove("on");
+      maskNow = null;                                    // next time the spotlight appears in place, without a grow from stale holes
       el.ring0.classList.remove("on"); el.ring1.classList.remove("on"); el.ring2.classList.remove("on");
       return;
     }
@@ -383,16 +430,19 @@
     el.stage.classList.toggle("lever-lit", !!open.tank);
     const host = el.stage.classList.contains("host");      // Guddu's line is in his bubble: the narrator box is away
     const narr = host ? shut(HOLES.narr) : HOLES.narr;
-    el.focus.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(narr)} ${rr(tank)} ${rr(pad)}")`;
-    el.focus.style.webkitClipPath = el.focus.style.clipPath;
-    el.focus.classList.add("on");
+    // what you see: the feathered mask; what stops taps: the same holes as a hard clip on #focusHit
+    const padRect = S.padHole || HOLES.padTut;
+    setFocusMask([softHole(padRect, !!open.pad), softHole(HOLES.tank, !!open.tank), softHole(HOLES.narr, !host, 14)], !el.focus.classList.contains("on"));
+    el.focusHit.style.clipPath = `path(evenodd, "M0 0H1920V1080H0Z ${rr(narr)} ${rr(tank)} ${rr(pad)}")`;
+    el.focusHit.style.webkitClipPath = el.focusHit.style.clipPath;
+    el.focus.classList.add("on"); el.focusHit.classList.add("on");
     const was = S.focusOpen || {};
     if (key === "narr" && S.focusKey !== key) FX.flash(el.ring0, "sweep", 1700);   // a new line: light sweeps the narrator box
-    if (open.tank && !was.tank) FX.flash(el.ring1, "sweep", 1700);
+    // the tank is not a box: no box-shaped halo or sweep around it (the soft edge is enough)
     if (open.pad && was.pad !== open.pad) FX.flash(el.ring2, "sweep", 1700);
     S.focusKey = key; S.focusOpen = open;
     placeRing(el.ring0, narr, !host);
-    placeRing(el.ring1, tank, !!open.tank);
+    placeRing(el.ring1, tank, false);
     placeRing(el.ring2, pad, !!open.pad);
   }
 
