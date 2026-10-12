@@ -95,13 +95,13 @@ window.GAME_DATA = {
       glow: [1, 2, 3],                                                     // the water rises to each mark, then it lights
       bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
       vo: "Above 0, there is more water than required.",
-      ost: "Above 0, there is more water than requirement." },
+      ost: "Above 0, there is more water than required." },          // voice and screen agree (sheet OST: "requirement")
     { type: "scene", id: "ST6", section: "story", scene: "p08e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 are highlighted one by one. Camera moves downward.
       glow: [-1, -2, -3],                                                  // the water falls to each mark, then it lights
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
       vo: "Below 0, there is less water than required.",
-      ost: "Below 0, there is less water than requirement." },
+      ost: "Below 0, there is less water than required." },          // voice and screen agree (sheet OST: "requirement")
     { type: "scene", id: "ST7", section: "story", scene: "p07e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 highlighted one by one, plus sign.
       glow: [1, 2, 3], sign: { text: "+", x: 1100, y: 395 },
@@ -261,7 +261,7 @@ window.GAME_DATA = {
       },
       entry: {
         vo: "Enter the new water level.",
-        ost: "Tap the new water level.",
+        ost: "Enter the new water level.",                               // voice and screen agree (sheet OST: "Tap")
         correct: "Correct! The new water level is +3.",                  // Equation completes: 0 + 3 = +3.
         wrong: null,
         idle: { text: "Enter the new water level.", fx: "pulseTargetPad" }, // +3 on the scale and dial pad gently pulse.
@@ -360,13 +360,13 @@ window.GAME_DATA = {
     { type: "scene", id: "Z4", section: "end", speaker: "pari", scene: "p11", sweep: true,      // The lever moves briefly from a negative number through 0 to a positive number.
       glow: [[918, 842], [918, 743], [918, 653], [925, 553], [920, 482], [920, 400], [920, 310]],
       bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
-      vo: "So integers helped us show water levels at 0, above 0, and below 0!",
+      vo: "So integers helped us show water levels below 0, at 0, and above 0!",   // number-line order, as the sheet OST (sheet VO: "at 0, above 0, and below 0")
       ost: "So integers helped us show water levels below 0, at 0, and above 0!" },
     { type: "scene", id: "Z5", section: "end", scene: "p12", fx: "badge",                       // Camera zooms out to the village and tank. Both wave. Completion badge.
       camera: { from: 1.5, to: 1, x: 730, y: 310 },
       bubble: { shape: "wide", tail: "left", w: 520, tip: [730, 310] },
       vo: "Excellent! You’re an Integers Expert now!",
-      ost: "Excellent! You’re a Water Level Expert now!" }
+      ost: "Excellent! You’re an Integers Expert now!" }            // voice and screen agree (sheet OST: "Water Level Expert")
   ]
 };
 
