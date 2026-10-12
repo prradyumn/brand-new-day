@@ -42,7 +42,8 @@ window.GAME_DATA = {
        pose      the full-size character's gesture while it speaks: talk (default) | point | thumbs
      Question fields:
        start / target   lever level at the start / the answer
-       eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3)
+       eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3). Rule: b is never
+                        negative (no "+ (−3)"): the water going down is written as "− 3"
        liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3
        autoLever        Level 3: the lever is off; it moves by itself after a correct answer
                         (Level 2/3 equations build with the question's VO: the sign on
@@ -284,8 +285,10 @@ window.GAME_DATA = {
       { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
       "Count 5 levels down from +3.", "Move the lever 5 levels down from +3."),
     // The sheet's VO says "goes down 6 levels" and the lever row's equation "(−2) - (6)", but the
-    // path, answer (−5), hints and completed equation all say 3 levels: kept 3 (agreed 2026-10-06).
-    q2("A4", -2, -5, { a: -2, op: "+", b: -3 },
+    // path, answer (−5), hints and on-screen text all say 3 levels: kept 3 (agreed 2026-10-06).
+    // Rule (2026-10-12): the second number is never negative, so the sheet's "(−2) + (−3) = −5"
+    // is written as going down 3 → subtract 3: (−2) − 3 = −5.
+    q2("A4", -2, -5, { a: -2, op: "−", b: 3 },
       "The water level goes down 3 levels. Move the lever to the correct water level.",
       "Move the lever 3 levels down.",
       { text: "The water level goes down. Move downward.", fx: "glowDirDown" },
