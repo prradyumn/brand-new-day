@@ -158,6 +158,10 @@
       </div>
 
       <!-- ============ HUD ============ -->
+      <!-- look back at the lines spoken so far (game.js "Look back"): icons only -->
+      <button id="btnBack" class="hud-btn off" aria-label="Look back at what was said">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10h32a5 5 0 0 1 5 5v16a5 5 0 0 1-5 5H22l-9 7v-7H8a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5z" fill="#fff" stroke="#0d3b8c" stroke-width="3" stroke-linejoin="round"/><path d="M27 16l-8 7 8 7" fill="none" stroke="#0d3b8c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <button id="btnLang" class="hud-btn" data-i18n="langBtn">हिंदी</button>   <!-- language: reloads at the same step (js/lang.js) -->
       <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
       <button id="btnJump" class="hud-btn hidden" aria-label="QA level jumper">⏭</button>
@@ -171,6 +175,22 @@
       </div>
 
       <div id="paused" class="hidden" role="status" aria-label="Paused"><div>⏸</div></div>
+
+      <!-- Look back: one earlier line at a time, with its voice (the game holds meanwhile) -->
+      <div id="review" class="hidden" role="dialog" aria-label="What was said">
+        <div class="review-card">
+          <button id="revClose" class="rev-btn rev-close" aria-label="Back to the game">✕</button>
+          <div class="review-line">
+            <div id="revFace" aria-hidden="true"></div>
+            <div class="review-words"><p id="revText"></p><p id="revNote" class="hidden"></p></div>
+          </div>
+          <div class="review-nav">
+            <button id="revPrev" class="rev-btn" aria-label="Earlier line">◀</button>
+            <button id="revPlay" class="rev-btn rev-play" aria-label="Hear it again">🔊</button>
+            <button id="revNext" class="rev-btn" aria-label="Later line">▶</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ============ SCREENS ============ -->
       <!-- Chapter break (story ↔ game): the screen floods, a title card floats up, the water drains away -->

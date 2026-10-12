@@ -29,6 +29,7 @@
     const t = (s) => tr(pack, s);
     for (const step of data.steps) {
       for (const k of ["vo", "ost", "button"]) if (step[k]) step[k] = t(step[k]);
+      if (step.eqVo && pack.eqVo) step.eqVo = pack.eqVo(step.eqVo);   // the equation read aloud: "0 + 3 = कितना?"
       if (step.idle) step.idle.text = t(step.idle.text);
       for (const part of [step.lever, step.entry]) {
         if (!part) continue;

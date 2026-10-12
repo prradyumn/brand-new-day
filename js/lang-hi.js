@@ -196,9 +196,18 @@
       [/^The new water level is ([+−]?\d+)\. Enter \1\.$/, (m) => `पानी का नया स्तर ${m[1]} है। ${m[1]} डालो।`]
     ],
 
-    /* what the voice reads (the screen keeps the symbols): +2 "धन 2", −3 "ऋण 3", 0 "शून्य" */
+    /* the equation Guddu reads aloud (data.js eqVo): the symbols stay, "?" is asked in Hindi
+       ("0 + 3 = कितना?" → "शून्य धन 3 बराबर कितना?") */
+    eqVo: (eq) => eq.replace(/\?$/, "कितना?"),
+
+    /* what the voice reads (the screen keeps the symbols): +2 "धन 2", −3 "ऋण 3", 0 "शून्य";
+       in an equation + is "धन", − "ऋण" and = "बराबर", as Hindi-medium classes read them */
     spoken: (text) => text
       .replace(/\s*\n\s*/g, " ")
+      .replace(/[()]/g, "")
+      .replace(/ \+ /g, " धन ")
+      .replace(/ − /g, " ऋण ")
+      .replace(/ = /g, " बराबर ")
       .replace(/−(\d)/g, "ऋण $1")
       .replace(/\+(\d)/g, "धन $1")
       .replace(/(?<![\d.])0(?!\d|\.\d)/g, "शून्य")

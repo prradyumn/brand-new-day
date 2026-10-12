@@ -66,11 +66,10 @@
     "pari-happy":  { src: "assets/char/avatar-pari-happy.png",  frames: 4, mouth: [0, 1, 2], blink: 3 }
   };
   const POSES = {                                // full-size Guddu (data.js `pose`), feet on the same spot in every strip
-    // tip / tipRight: where the speech bubble's tail points (beside his head, stage px) when
-    // he stands on the left (over the keypad) / on the right (over the tank, mirrored)
-    talk:   { src: "assets/char/guddu-talk.png",   frames: 3, mouth: [0, 1, 2], tip: [352, 352], tipRight: [1252, 352] },
-    point:  { src: "assets/char/guddu-point.png",  frames: 2, mouth: [0, 1, 1], tip: [446, 352], tipRight: [1172, 344] },
-    thumbs: { src: "assets/char/guddu-thumbs.png", frames: 2, mouth: [0, 1, 1], tip: [318, 346], tipRight: [1290, 346] }
+    // tip: where the speech bubble's tail points (beside his head, stage px); he stands on the left
+    talk:   { src: "assets/char/guddu-talk.png",   frames: 3, mouth: [0, 1, 2], tip: [352, 352] },
+    point:  { src: "assets/char/guddu-point.png",  frames: 2, mouth: [0, 1, 1], tip: [446, 352] },
+    thumbs: { src: "assets/char/guddu-thumbs.png", frames: 2, mouth: [0, 1, 1], tip: [318, 346] }
   };
 
   /* ---------------- DOM ---------------- */
@@ -90,6 +89,8 @@
     under: $("under"), flood: $("flood"),
     story: $("story"), shots: [...document.querySelectorAll("#story .shot")], caption: $("caption"),
     bubble: $("bubble"), hostBubble: $("hostBubble"),
+    btnBack: $("btnBack"), review: $("review"), revFace: $("revFace"), revText: $("revText"), revNote: $("revNote"),
+    revPrev: $("revPrev"), revNext: $("revNext"), revPlay: $("revPlay"), revClose: $("revClose"),
     charArt: document.querySelector("#character .art"), charGlow: $("charGlow")
   };
 
@@ -108,6 +109,10 @@
     countFrom: null,     // level the dashed count line starts from
     water: null,         // fixed water level; null = water follows the marker
     entry: "",
+    padLive: false,      // the keypad takes keys (from the start of its instruction; Level 1/2: from the lever's lock)
+    checkQueued: false,  // Check was pressed while a line was still playing: checked as soon as it ends
+    section: null,       // the current step's section (data.js config.voicePace)
+    reviewing: false,    // the look-back card is up (the game holds)
     wrong: 0,            // wrong attempts in the current part
     gate: null,          // current transition step
     guided: false,       // spotlight/blur + character
@@ -433,10 +438,12 @@
     // The narrator box stays lit the whole time so the instruction can always be read.
     // `key` picks what is lit beside it; the tank and keypad holes each have their own
     // slot and open/close in place, so a hole never slides across the narrator box.
+    // Whenever the keypad is lit the tank is too: the learner types the level the
+    // marker shows, so the marker must stay in sight (2026-10-12 review).
     const sets = {
       narr: {},
       tank: { tank: HOLES.tank },
-      pad: { pad: HOLES.padTut },
+      pad: { pad: HOLES.padTut, tank: HOLES.tank },
       padTank: { pad: HOLES.padTut, tank: HOLES.tank },   // How to Play step 5: "Both glow"
       gate: { pad: HOLES.gate }
     };
@@ -523,7 +530,13 @@
     setAvatar(mood);
     FX.flash(el.banner, "speak", 400);
   }
-  const speak = (text) => FX.speak(text, { pitch: SPEAKERS[S.speaker].pitch, speaker: S.speaker });   // speaker picks the recorded clip
+  /** Speak a line in the current speaker's voice (speaker picks the recorded clip), at the
+      section's pace (config.voicePace), and keep it for the look-back card. */
+  async function speak(text) {
+    const who = S.speaker, pace = (CFG.voicePace || {})[S.section] || 1;
+    await FX.speak(text, { pitch: SPEAKERS[who].pitch, speaker: who, pace });
+    remember(who, text);
+  }
   /** Feedback line (always Guddu Bhaiya). */
   async function say(text, mood) {
     setSpeaker("guddu");
@@ -552,18 +565,17 @@
     S.phase = "narrate";
     setSpeaker(speaker);
     setBanner(text, mood);
-    const full = S.guided && SPEAKERS[S.speaker].full;
+    // Full size only where he can stand over something blurred: a keypad line lights the
+    // keypad and the tank, so it is spoken from the (lit) narrator box instead.
+    const full = S.guided && SPEAKERS[S.speaker].full && look !== "pad";
     if (full) {
       const set = POSES[pose] || POSES.talk;          // a gesture that fits the line (data.js `pose`)
       if (el.charArt.sprite !== set) setSprite(el.charArt, set);
-      // He stands over what is NOT lit and points at what is: on keypad lines he moves in
-      // front of the (blurred) tank, mirrored, so the keypad stays completely visible.
-      const right = look === "pad";
-      el.character.classList.toggle("right", right);
-      el.charGlow.classList.toggle("right", right);
+      // He stands on the left, over what is NOT lit (the keypad side, blurred on the tank lines;
+      // "padTank": the How to Play finish, thumbs up), and points at what is.
       el.character.classList.add("in", "talk");
       el.stage.classList.add("host");               // one Guddu at a time: his line goes in the story's speech bubble beside him
-      placeBubble({ shape: "wide", tail: "left", w: 560, tip: right ? set.tipRight : set.tip }, text, el.hostBubble);
+      placeBubble({ shape: "wide", tail: "left", w: 560, tip: set.tip }, text, el.hostBubble);
       setTimeout(() => el.stage.classList.contains("host") && el.hostBubble.classList.add("on"), 380);   // as he lands
     }
     focusOn(look || "narr");
@@ -593,15 +605,20 @@
       S.phase = "feedback";
       setMarkerEnabled(false);
       await sayFocused(p.idle.text, "think", fxArea(p.idle.fx));
-      await runFx(p.idle.fx, q, p.idle);
+      if (!S.checkQueued && eqAsks(q)) await readEq(q);          // … and the equation: "(+2) + 3 = ?"
+      if (!S.checkQueued) await runFx(p.idle.fx, q, p.idle);
       setBanner(p.ost, "happy");
       S.phase = phase;
       if (phase === "marker") setMarkerEnabled(true);
+      if (phase === "entry" && S.checkQueued) { S.checkQueued = false; checkEntry(); }   // Check pressed during the reminder
     } else if (S.phase === "gate" && S.gate) {
       const step = S.gate;
       await sayFocused(step.idle.text, "happy");
+      if (S.gate !== step) return;                                                 // tapped on while it played
       if (step.idle.fx === "pulseGate") FX.flash(el.gateBtn, "nudge", 3700);      // "Start button … gently pulses."
       if (step.idle.fx === "pulseEqPanel") FX.flash(el.eqPanel, "nudge", 3700);   // "Equation panel gently pulses."
+      if (step.readEq) await readEq(nextStep(step));                               // "Let's find the new water level." … "0 + 3 = ?"
+      if (S.gate !== step) return;
     }
     resetIdle();
   }
@@ -888,8 +905,9 @@
     const e = q.eq, live = moved !== null && moved !== 0;
     eqParts().forEach((n) => n.classList.remove("eqhide"));
     el.eqA.textContent = termA(e.a);
-    el.eqOp.textContent = e.op;
-    el.eqB.textContent = termB(live ? moved : e.b);
+    // live: up 2 → "+ 2", down 2 → "− 2" (the second number is never negative: no "+ (−2)")
+    el.eqOp.textContent = live ? (moved > 0 ? "+" : "−") : e.op;
+    el.eqB.textContent = live ? String(Math.abs(moved)) : termB(e.b);
     el.eqEq.classList.toggle("gone", live);
     el.eqAns.classList.toggle("gone", live);
     el.eqAns.textContent = answer !== null ? fmt(answer) : "?";
@@ -971,9 +989,37 @@
   }
   /** Wait until the voice reaches `word` in `text` (gives up if the line never plays). */
   async function untilWord(text, word) {
-    const at = wordAt(text, word), until = performance.now() + FX.readTime(text) * 2 + 4000;
-    while (FX.progress(text) < at && performance.now() < until) await FX.sleep(40);
+    await untilProgress(text, wordAt(text, word));
   }
+  /** Wait until the voice is `at` (0…1) of the way through `text` (time on the look-back card doesn't count). */
+  async function untilProgress(text, at) {
+    const budget = FX.readTime(text) * 2.5 + 4000, t0 = performance.now(), h0 = FX.heldMs;
+    while (FX.progress(text) < at && performance.now() - t0 - (FX.heldMs - h0) < budget) await FX.sleep(40);
+  }
+
+  /** Guddu reads the question's equation aloud (data.js eqVo: "0 + 3 = ?" → "zero plus 3
+      equals what?"); each card lights up on its word and the narrator box shows the line. */
+  async function readEq(q) {
+    if (!q || !q.eqVo || el.eqPanel.classList.contains("hidden")) return;
+    const before = el.bannerText.textContent;
+    setSpeaker("guddu");
+    setBanner(q.eqVo, "happy");
+    const cards = eqParts().filter((n) => !n.classList.contains("gone"));
+    const words = cards.map((n) => (/^\(.+\)$/.test(n.textContent) ? 2 : 1));   // "(+2)" is said in two words ("plus 2")
+    const total = words.reduce((a, b) => a + b, 0);
+    const line = speak(q.eqVo);
+    let at = 0;
+    for (let i = 0; i < cards.length; i++) {
+      await untilProgress(q.eqVo, at / total);
+      FX.flash(cards[i], "eqread", 900);
+      at += words[i];
+    }
+    await line;
+    setBanner(before, "happy");
+  }
+  /** The panel shows the question itself ("(+2) + 3 = ?", not the lever's live count). */
+  const eqAsks = (q) => !!(q && q.eqVo) && !el.eqPanel.classList.contains("hidden") &&
+    !el.eqAns.classList.contains("gone") && el.eqAns.textContent === "?";
 
   /** Level 2 teaching example (P3, P5): "If the water level is at +1" → 1,
       "and rises" → +, "by 2 levels" → the levels light one by one and the
@@ -1021,7 +1067,7 @@
   }
 
   function pressKey(k) {
-    if (S.phase !== "entry") return;
+    if (!S.padLive || S.reviewing) return;
     resetIdle();
     applyKey(k);
     previewEntry();
@@ -1038,7 +1084,7 @@
     return Math.max(CFG.levelMin, Math.min(CFG.levelMax, v));
   }
   async function previewEntry() {
-    if (!S.q || !S.q.autoLever || S.phase !== "entry") return;
+    if (!S.q || !S.q.autoLever || !S.padLive) return;
     const L = typedLevel(), to = L === null ? S.q.start : L;
     const my = ++previewGen;
     while (S.level !== to && my === previewGen) {
@@ -1059,7 +1105,7 @@
     entryDisplay();
   }
   function backspace() {
-    if (S.phase !== "entry") return;
+    if (!S.padLive || S.reviewing) return;
     resetIdle();
     FX.sfx("key", 0.8);
     S.entry = S.entry.slice(0, -1);
@@ -1067,10 +1113,17 @@
     previewEntry();
   }
   function checkEntry() {
-    if (S.phase !== "entry") return;
+    if (!S.padLive || S.reviewing) return;
+    const m = /^([+-]?)(\d+)$/.exec(S.entry);
+    if (S.phase !== "entry") {                               // a line is still playing ("Correct!", the instruction):
+      FX.sfx("button");                                      // end it and check straight after
+      if (!m) { FX.flash(el.plate, "shake", 500); return; }
+      S.checkQueued = true;
+      FX.endLine();
+      return;
+    }
     resetIdle();
     FX.sfx("button");
-    const m = /^([+-]?)(\d+)$/.exec(S.entry);
     if (!m) { FX.flash(el.plate, "shake", 500); return; }    // nothing to check yet
     const val = (m[1] === "-" ? -1 : 1) * parseInt(m[2], 10);
     // 0 has no sign; positive answers need "+" (CSV: "presses + and 2")
@@ -1092,12 +1145,14 @@
     if (q.autoLever) { previewGen++; await animateTo(q.start, 150); }   // Level 3: the water slides back to the start
     if (!p.wrong) { resetIdle(); return; }
     S.phase = "feedback";
+    S.padLive = false;                                       // the hint first
     stopIdle();
     const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
     await sayFocused(fb.text, "sad", fxArea(fb.fx));
     await runFx(fb.fx, q, fb);
     setBanner(p.ost, "happy");
     S.phase = "entry";
+    S.padLive = true;
     resetIdle();
   }
 
@@ -1107,7 +1162,7 @@
   el.btnClear.addEventListener("pointerdown", (e) => { e.stopPropagation(); backspace(); });
   el.btnCheck.addEventListener("pointerdown", (e) => { e.stopPropagation(); checkEntry(); });
   window.addEventListener("keydown", (e) => {
-    if (S.phase !== "entry") return;
+    if (!S.padLive || S.reviewing) return;
     if (/^[0-9]$/.test(e.key)) pressKey(e.key);
     else if (e.key === "+" || e.key === "-") pressKey(e.key);
     else if (e.key === "Backspace") backspace();
@@ -1321,7 +1376,7 @@
       FX.confetti(el.confetti, { count: 90, x: 820, y: 330 });
     }
     await sayFocused(p.correct, "happy", S.area);     // "Correct! You reached 0." with the scale (or display) still lit
-    await FX.sleep(500);
+    await FX.sleep(S.checkQueued ? 0 : 500);
   }
 
   /* =================================================================
@@ -1373,6 +1428,7 @@
     await Promise.all([narrate(p.vo, { pose: p.pose, look: "tank" }), S.eqBuild && buildQuestionEq(q, p.vo)]);
     S.eqBuild = false;
     setBanner(p.ost, "happy");
+    noteOst(p.vo, p.ost);
     focusOn("tank");
     S.countFrom = q.start;
     render();
@@ -1394,6 +1450,10 @@
     if (q.eq) renderEq(q);                               // back to the full question "0 + 3 = ?" for the keypad step
     FX.flash(S.labels[q.target], "pulse", 2800);
     if (q.target === 0) { FX.flash(S.ticks[0], "pulse", 2800); FX.flash(S.tticks[0], "pulse", 2800); }   // "The 0 mark glows briefly."
+    // The keypad works from the lock on (2026-10-12 review: Level 1 waited ~6 s for the next
+    // instruction): what is typed during "Correct!" stays, and Check ends the line early.
+    // Not in the guided tutorial, where the keypad is behind the glass until its own step.
+    if (q.entry && !S.guided) { S.entry = ""; entryDisplay(); S.padLive = true; }
     await succeed(q, p, "level");
   }
 
@@ -1402,18 +1462,23 @@
     S.part = p; S.wrong = 0; S.area = "pad";
     showPlate();
     showPanel();
-    await Promise.all([narrate(p.vo, { pose: p.pose, look: "pad" }), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
+    if (!S.padLive) { S.entry = ""; entryDisplay(); }
+    S.padLive = true;                                     // keys work while the instruction plays; Check ends it
+    const answered = new Promise((r) => (S.resolveEntry = r));
+    if (S.entry === "" && !S.checkQueued)                 // (already typing since "Correct!": no need to be told)
+      await Promise.all([narrate(p.vo, { pose: p.pose, look: "pad" }), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
+    else if (S.eqBuild) renderEq(q);
     S.eqBuild = false;
-    S.entry = "";
-    entryDisplay();
     setBanner(p.ost, "happy");
+    noteOst(p.vo, p.ost);
     focusOn("pad");
-    await FX.sleep(400);
     S.phase = "entry";
     if (q.autoLever) { S.countFrom = q.start; render(); }    // the dashed line shows how far the typed answer is from the start
     resetIdle();
-    await new Promise((r) => (S.resolveEntry = r));
+    if (S.checkQueued) { S.checkQueued = false; checkEntry(); }
+    await answered;
     S.resolveEntry = null;
+    S.padLive = false;
     previewGen++;                                         // the answer is in: no more preview steps
     stopIdle();
     S.phase = "feedback";
@@ -1526,8 +1591,21 @@
     if (!step.ostAfter) await showOst();
     await Promise.all([narrate(step.vo, { speaker: step.speaker }), sayFx(step, showOst)]);
     if (!step.ostIn) setBanner(step.ost, "happy");
-    await FX.sleep(500);
+    noteOst(step.vo, step.ost);
+    if (step.readEq) await readEq(nextQuestion(step));   // "The first water-level challenge appears" … and Guddu reads it
+    await FX.sleep(lingerMs(step));
   }
+  /** How long a row's words stay up after its voice, so they can be read (2026-10-12 review:
+      Level 2's summaries, "Water level rises → Add", were gone after half a second). */
+  const plain = (t) => (t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  function lingerMs(step) {
+    if (step.ostIn === "eq") return 1500;                // a look at the finished equation
+    if (step.ostIn || !step.ost || plain(step.ost) === plain(step.vo)) return 900;   // the line was on screen while it was spoken
+    const words = step.ost.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+    return Math.min(4500, Math.max(2600, 1200 + 450 * words));   // other words than the voice: time to read them
+  }
+  const nextStep = (step) => DATA.steps[DATA.steps.indexOf(step) + 1];
+  const nextQuestion = (step) => DATA.steps.slice(DATA.steps.indexOf(step)).find((s) => s.type === "question");
 
   /** The animation in each row's "Scene Description" (plays while the line is spoken). */
   async function sayFx(step, showOst) {
@@ -1585,7 +1663,11 @@
         document.querySelectorAll(".key:not(.key--sign)").forEach((k) => FX.flash(k, "keypulse", 2800));
         break;
       case "showNextEq":                                 // "The first water-level challenge appears."
-        if (nextQ && nextQ.eq) { renderEq(nextQ); showEqPanel(); setPlate("?"); }
+        if (nextQ && nextQ.eq) {
+          setPlate("?");
+          if (S.level !== nextQ.start) await animateTo(nextQ.start, 200);   // the water at the challenge's start level
+          renderEq(nextQ); showEqPanel();
+        }
         break;
       case "padActive":                                  // "Dial pad stays active."
         FX.flash(el.panel, "activate", 1300);
@@ -1890,9 +1972,12 @@
       setMode("lvl");
       if (next && next.start != null) setPlate("?");
       await FX.sleep(400);
+      // the equation starts where the water is (2026-10-12 review: "0 + 3 = ?" showed beside the −2 of the last example)
+      if (next && next.start != null && S.level !== next.start) await animateTo(next.start, 200);
       if (next && next.eq) renderEq(next);
       showEqPanel();
       await FX.sleep(900);
+      if (step.readEq) await readEq(next);                 // "0 + 3 = ?" read aloud, card by card
     }
     if (step.button) {                                     // "Learner taps Start"
       el.gateBtn.textContent = step.button;
@@ -1922,9 +2007,82 @@
   // "Learner observes and taps to continue." — a tap anywhere on the game, including
   // the keypad (capture phase, before the keys stop the event); HUD/QA controls excluded
   el.stage.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("#btnMute, #btnJump, #jumper, #paused")) return;
+    if (e.target.closest("#btnMute, #btnJump, #btnBack, #review, #jumper, #paused")) return;
     if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   }, true);
+
+  /* =================================================================
+     Look back (◀ in the HUD, 2026-10-12 review: "a button to go back … to refer to the
+     text"). The card shows the lines spoken so far, one at a time with their voice:
+     ◀ earlier, ▶ later, 🔊 again, ✕ back to the game. The game holds while it is up
+     (FX.hold) and the line that was playing starts again after. Only icons are added:
+     every line shown is one the game spoke, with the words that stayed on screen after it.
+     ================================================================= */
+  const said = [];
+  function remember(speaker, text) {
+    const last = said[said.length - 1];
+    if (!text || (last && last.text === text && last.speaker === speaker)) return;
+    said.push({ speaker, text, note: null });
+    if (said.length > 40) said.shift();
+    el.btnBack.classList.remove("off");
+  }
+  /** The words left on screen after a line ("Water level rises → Add", "1 + 2 = ?"), when they differ from it. */
+  function noteOst(vo, ost) {
+    const last = said[said.length - 1];
+    if (last && last.text === vo && ost && plain(ost) !== plain(vo)) last.note = ost;
+  }
+  let revAt = 0;
+  function openReview() {
+    if (!said.length || S.reviewing) return;
+    FX.sfx("button");
+    S.reviewing = true;
+    stopIdle();
+    FX.hold(true);                                   // the line playing now stops; it starts again on ✕
+    el.review.classList.remove("hidden");
+    showReview(said.length - 1);
+    el.revClose.focus({ preventScroll: true });     // keys go to the card, not the marker
+  }
+  function showReview(i) {
+    revAt = Math.max(0, Math.min(said.length - 1, i));
+    const h = said[revAt];
+    const face = h.speaker === "narrator" ? null : AVATARS[h.speaker === "pari" ? "pari-happy" : "guddu-happy"];
+    el.revFace.classList.toggle("none", !face);
+    if (face) {
+      el.revFace.style.backgroundImage = `url(${face.src})`;
+      el.revFace.style.backgroundSize = `${face.frames * 100}% 100%`;
+    }
+    el.revText.textContent = h.text;
+    el.revNote.textContent = h.note || "";
+    el.revNote.classList.toggle("hidden", !h.note);
+    fitText(el.revText, 46, 24);
+    el.revPrev.disabled = revAt === 0;
+    el.revNext.disabled = revAt === said.length - 1;
+    FX.flash(el.review.firstElementChild, "turn", 450);
+    FX.preview(h.text, h.speaker);
+  }
+  function closeReview() {
+    if (!S.reviewing) return;
+    FX.previewStop();
+    el.review.classList.add("hidden");
+    S.reviewing = false;
+    FX.hold(false);
+    resetIdle();
+  }
+  const tapOnly = (node, f) => node.addEventListener("pointerdown", (e) => { e.stopPropagation(); e.preventDefault(); f(e); });
+  tapOnly(el.btnBack, openReview);
+  tapOnly(el.revPrev, () => showReview(revAt - 1));
+  tapOnly(el.revNext, () => showReview(revAt + 1));
+  tapOnly(el.revPlay, () => { const h = said[revAt]; if (h) FX.preview(h.text, h.speaker); });
+  tapOnly(el.revClose, closeReview);
+  el.review.addEventListener("pointerdown", (e) => { e.stopPropagation(); if (e.target === el.review) closeReview(); });
+  window.addEventListener("keydown", (e) => {
+    if (!S.reviewing) return;
+    if (e.key === "Escape") closeReview();
+    else if (e.key === "ArrowLeft") showReview(revAt - 1);
+    else if (e.key === "ArrowRight") showReview(revAt + 1);
+    else return;
+    e.preventDefault();
+  });
 
   /* =================================================================
      QA level jumper — lists every step; picking one reloads with ?step=ID.
@@ -2027,6 +2185,7 @@
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;
       S.stepId = step.id;                                 // the language button reloads at this step
+      S.section = step.section;                           // config.voicePace
       if (step.type === "question") await runQuestion(step, { flip });
       else if (step.type === "gate") await runGate(step);
       else if (step.type === "demo") await runDemo(step);

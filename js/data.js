@@ -19,6 +19,7 @@ window.GAME_DATA = {
     maxDigits: 2,
     speechRate: 0.95,
     speechLang: "en-IN",
+    voicePace: { level2: 0.88 },   // the voice a little slower where the learner reads equations along (2026-10-12 review: Level 2 was too fast)
     qaJumper: true            // QA level jumper (⏭ button, ?step=ID). Set false for release.
   },
 
@@ -44,7 +45,11 @@ window.GAME_DATA = {
        start / target   lever level at the start / the answer
        eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3). Rule: b is never
                         negative (no "+ (−3)"): the water going down is written as "− 3"
-       liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3
+       eqVo             the equation as Guddu reads it aloud ("0 + 3 = ?" → "zero plus 3 equals what?"),
+                        with each card lighting up on its word: when the equation first appears
+                        (gate / say row with readEq) and in the inactivity reminders
+       liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3 (all of Level 2; going
+                        down it reads (+2) − 1, never "+ (−1)")
        autoLever        Level 3: the lever is off; it moves by itself after a correct answer
                         (Level 2/3 equations build with the question's VO: the sign on
                         "rises"/"goes up"/"goes down", the number on "3 levels", then "= ?")
@@ -242,7 +247,7 @@ window.GAME_DATA = {
       type: "gate", id: "TR2", section: "level2",
       vo: "Let’s calculate the water levels exactly.",
       ost: "Let’s calculate the water levels exactly!",
-      appear: "eqPanel",                                                 // Equation panel appears beside the tank.
+      appear: "eqPanel", readEq: true,                                   // Equation panel appears beside the tank (the water goes to its start level); Guddu reads it.
       continueOnTap: true,                                               // Learner observes and taps to continue.
       idle: { text: "Let’s find the new water level.", fx: "pulseEqPanel" } // Equation panel gently pulses.
     },
@@ -250,7 +255,7 @@ window.GAME_DATA = {
     /* ======================= LEVEL 2 GAME ======================= */
     {
       type: "question", id: "A0", section: "level2",
-      start: 0, target: 3, eq: { a: 0, op: "+", b: 3 }, liveEq: true,   // Tutorial: 0 + 3 = ?
+      start: 0, target: 3, eq: { a: 0, op: "+", b: 3 }, eqVo: "0 + 3 = ?", liveEq: true,   // Tutorial: 0 + 3 = ?
       lever: {
         vo: "The water level is at 0. It goes up 3 levels. Move the lever 3 levels up.",
         ost: "Move the lever 3 levels up.",
@@ -321,7 +326,7 @@ window.GAME_DATA = {
     { type: "say", id: "R4", section: "level3", fx: "keysPulse",                        // The sign and number buttons gently pulse.
       vo: "Choose the correct sign and number.",
       ost: "Choose the correct sign and number." },
-    { type: "say", id: "R5", section: "level3", fx: "showNextEq",                       // The first water-level challenge appears.
+    { type: "say", id: "R5", section: "level3", fx: "showNextEq", readEq: true,         // The first water-level challenge appears (and Guddu reads it).
       vo: "And Let’s see where the water level reaches!",
       ost: "And Let’s see where the water level reaches!" },
     { type: "say", id: "R6", section: "level3", speaker: "pari", fx: "padActive",       // Dial pad stays active.
@@ -407,11 +412,14 @@ function q1(id, start, target, vo, wrong2fx, idleFx) {
   };
 }
 
-/** Level 2 example: lever part + keypad part, with the equation panel. */
+/** "(+2) + 3 = ?": the equation as the panel writes it (game.js termA / termB). */
+function eqText(start, eq) { return `${start === 0 ? "0" : `(${signed(start)})`} ${eq.op} ${eq.b} = ?`; }
+
+/** Level 2 example: lever part + keypad part, with the equation panel (it follows the lever). */
 function q2(id, start, target, eq, vo, ost, wrong2, count, idle, leverCorrect, entryCorrect) {
   const t = signed(target);
   return {
-    type: "question", id, section: "level2", start, target, eq,
+    type: "question", id, section: "level2", start, target, eq, eqVo: eqText(start, eq), liveEq: true,
     lever: {
       vo, ost,
       correct: leverCorrect || `Correct! You reached ${t}.`,                    // Lever locks at …
@@ -446,7 +454,7 @@ function q3(id, start, target, eq) {
   const a = start === 0 ? "0" : `(${signed(start)})`;
   const line = `The water level is at ${s}. It goes ${way} ${n} levels. Enter the new water level.`;
   return {
-    type: "question", id, section: "level3", start, target, eq, autoLever: true,
+    type: "question", id, section: "level3", start, target, eq, eqVo: eqText(start, eq), autoLever: true,
     entry: {
       vo: line,
       ost: `${a} ${eq.op} ${n} = ?\n${line}`,

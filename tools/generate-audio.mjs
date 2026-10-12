@@ -78,6 +78,7 @@ function loadLines() {
   for (const s of data.steps) {
     const who = s.speaker || "guddu";
     add(who, s.vo);                                   // demo / say / gate
+    add("guddu", s.eqVo);                             // the question's equation, read aloud
     if (s.idle) add("guddu", s.idle.text);            // gate inactivity
     for (const p of [s.lever, s.entry]) {
       if (!p) continue;
@@ -99,6 +100,10 @@ function spokenForm(text, lang) {
   if (lang === "hi") return spokenHi(text);
   return text
     .replace(/\s*\n\s*/g, " ")
+    .replace(/[()]/g, "")                                          // an equation: "(+2) + 3 = ?" → "plus 2 plus 3 equals what?"
+    .replace(/ \+ /g, " plus ")
+    .replace(/ − /g, " minus ")
+    .replace(/ = \?$/, " equals what?")
     .replace(/−(\d)/g, "minus $1")
     .replace(/\+(\d)/g, "plus $1")
     .replace(/(?<![\d.])0(?!\d|\.\d)/g, "zero")

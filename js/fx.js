@@ -8,7 +8,15 @@
   const FX = {};
 
   /* ---------- timing ---------- */
-  FX.sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  /* FX.hold(true) pauses the game (the look-back card, game.js): the current line is cut
+     and starts again when the hold ends, and every FX.sleep waits at its end until then. */
+  let held = false, heldSince = 0;
+  const holdWaiters = [];
+  FX.heldMs = 0;                                   // total time spent held (timeouts can leave it out)
+  FX.sleep = async (ms) => {
+    await new Promise((r) => setTimeout(r, ms));
+    while (held) await new Promise((r) => holdWaiters.push(r));
+  };
   FX.nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
   /** Re-trigger a CSS animation class on an element. */
@@ -83,7 +91,18 @@
      or the window loses focus, the current line is cut off and the game waits;
      when the learner comes back, that line starts again from the beginning. */
   let blurred = false;
-  const isAway = () => document.hidden || blurred;
+  const isAway = () => document.hidden || blurred || held;
+  FX.hold = (on) => {
+    on = !!on;
+    if (on === held) return;
+    held = on;
+    if (on) heldSince = performance.now();
+    else {
+      FX.heldMs += performance.now() - heldSince;
+      holdWaiters.splice(0).forEach((r) => r());
+    }
+    onPresence();
+  };
   const leaveHooks = new Set();
   let backWaiters = [];
   const whenBack = () => (isAway() ? new Promise((r) => backWaiters.push(r)) : Promise.resolve());
@@ -125,12 +144,23 @@
     window.dispatchEvent(new CustomEvent("fx:voiceproblem", { detail: reason }));
   }
 
+  /** End the line that is playing now, as if it had finished (game.js: Check pressed during
+      the keypad instruction). Whoever waits on it carries on at once. */
+  let endActive = null;
+  FX.endLine = () => {
+    if (!endActive) return;
+    try { synth && synth.cancel(); } catch (e) {}
+    endActive();
+  };
+
   /** One attempt at a line. Resolves true if it was cut off because the learner left. */
   function speakOnce(text, spoken, opts) {
     return new Promise((resolve) => {
+      if (endActive) endActive();                     // a line still playing ends first (whoever waits on it carries on)
       const t0 = performance.now();
       let done = false, timer = null, poll = null, muting = false, clipOn = false;
-      line = { text, t0, ms: FX.readTime(text), clip: false };
+      const pace = opts.pace || 1;                   // < 1: a slower voice (game.js: config.voicePace)
+      line = { text, t0, ms: FX.readTime(text) / pace, clip: false };
       if (lastLine === text) lastLine = null;
       const stopClip = () => {
         if (!clipOn) return;
@@ -151,14 +181,17 @@
         stopClip();
         leaveHooks.delete(onLeave);
         muteHooks.delete(onMute);
+        if (endActive === endMe) endActive = null;
         resolve(!!cut);
       };
       const onLeave = () => finish(true);
       leaveHooks.add(onLeave);
+      const endMe = () => finish();
+      endActive = endMe;
       // Without sound the text stays up for its reading time, counted from when the line began.
       const readFallback = () => {
         clearTimeout(timer);
-        timer = setTimeout(finish, Math.max(0, FX.readTime(text) - (performance.now() - t0)));
+        timer = setTimeout(finish, Math.max(0, FX.readTime(text) / pace - (performance.now() - t0)));
       };
       // Muting mid-line doesn't skip ahead: the line goes quiet and the text stays up.
       const onMute = () => {
@@ -193,6 +226,8 @@
         voEl.onended = () => finish();
         voEl.onerror = () => toSynth("error");
         voEl.src = clip;
+        voEl.preservesPitch = voEl.webkitPreservesPitch = true;   // slower, not deeper
+        voEl.defaultPlaybackRate = voEl.playbackRate = pace;      // (a new src resets the rate to the default)
         voEl.volume = 1;
         const p = voEl.play();
         if (p && p.catch) p.catch((e) => toSynth(e && e.name));
@@ -235,7 +270,7 @@
             voice = voice || pickVoice(FX.lang || "en-IN");
             if (voice) u.voice = voice;
             u.lang = (voice && voice.lang) || FX.lang || "en-IN";
-            u.rate = opts.rate || FX.rate || 0.95;
+            u.rate = (opts.rate || FX.rate || 0.95) * pace;
             u.pitch = opts.pitch || 1.05;   // game.js: a little higher for Pari
             u.onstart = () => { console.info("[voice] speaking:", text, "| voice:", u.voice ? u.voice.name : "default"); markStarted(); };
             u.onend = () => { if (!muting) finish(); };
@@ -279,7 +314,8 @@
       for (;;) {
         if (isAway()) {
           // tell the page it's waiting for the learner, so it can show a "Paused" card
-          window.dispatchEvent(new Event("fx:paused"));
+          // (not for a hold: the look-back card is up)
+          if (!held) window.dispatchEvent(new Event("fx:paused"));
           await whenBack();
           window.dispatchEvent(new Event("fx:resumed"));
         }
@@ -293,6 +329,35 @@
   };
 
   FX.stopSpeech = () => { gen++; if (synth) synth.cancel(); voEl.pause(); duck(false); };
+
+  /** Play one earlier line while the game is held (the look-back card): the recorded clip,
+      else the browser voice. Nothing waits on it; FX.previewStop() silences it. */
+  FX.preview = (text, speaker) => {
+    FX.previewStop();
+    if (FX.muted || !held) return;
+    const clip = FX.clipFor(text, speaker);
+    if (clip) {
+      voEl.src = clip;
+      voEl.defaultPlaybackRate = voEl.playbackRate = 1;
+      voEl.volume = 1;
+      const p = voEl.play();
+      if (p && p.catch) p.catch(() => {});
+    } else if (synth) {
+      const spoken = window.LANG === "hi" && window.LANG_HI ? window.LANG_HI.spoken(text) : text.replace(/−/g, "minus ").replace(/\+(\d)/g, "plus $1");
+      const u = new SpeechSynthesisUtterance(spoken);
+      voice = voice || pickVoice(FX.lang || "en-IN");
+      if (voice) u.voice = voice;
+      u.lang = (voice && voice.lang) || FX.lang || "en-IN";
+      u.rate = FX.rate || 0.95;
+      FX._utterance = u;
+      synth.speak(u);
+    }
+  };
+  FX.previewStop = () => {
+    voEl.onended = voEl.onerror = voEl.onplaying = null;
+    voEl.pause();
+    try { synth && synth.cancel(); } catch (e) {}
+  };
 
   /** Call synchronously inside the Play click. Safari only allows speech and
       audio that start from a tap: this unlocks the browser voice and the clip player. */
