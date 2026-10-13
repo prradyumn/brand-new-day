@@ -89,7 +89,8 @@
     under: $("under"), flood: $("flood"),
     story: $("story"), shots: [...document.querySelectorAll("#story .shot")], caption: $("caption"),
     bubble: $("bubble"), hostBubble: $("hostBubble"),
-    btnBack: $("btnBack"), review: $("review"), revFace: $("revFace"), revText: $("revText"), revNote: $("revNote"),
+    btnBack: $("btnBack"), btnStoryBack: $("btnStoryBack"), btnPause: $("btnPause"), btnResume: $("btnResume"),
+    review: $("review"), revFace: $("revFace"), revText: $("revText"), revNote: $("revNote"),
     revPrev: $("revPrev"), revNext: $("revNext"), revPlay: $("revPlay"), revClose: $("revClose"),
     charArt: document.querySelector("#character .art"), charGlow: $("charGlow")
   };
@@ -113,6 +114,11 @@
     checkQueued: false,  // Check was pressed while a line was still playing: checked as soon as it ends
     section: null,       // the current step's section (data.js config.voicePace)
     reviewing: false,    // the look-back card is up (the game holds)
+    paused: false,       // ⏸ pressed: everything stands still until ▶
+    inScene: false,      // a story scene is playing (⏮ goes back a scene)
+    backReq: false,      // ⏮ pressed during a scene: it stops and the scene before it plays
+    sceneSwap: false,    // the next scene cross-fades in even if it shows the same art (⏮)
+    floodBack: null,     // ⏮ on the "How to Play" card: back to the last scene
     wrong: 0,            // wrong attempts in the current part
     gate: null,          // current transition step
     guided: false,       // spotlight/blur + character
@@ -677,8 +683,9 @@
   el.marker.addEventListener("pointerup", endDrag);
   el.marker.addEventListener("pointercancel", endDrag);
 
+  const holding = () => S.reviewing || S.paused;
   function step(dir) {
-    if (!S.markerEnabled) return;
+    if (!S.markerEnabled || holding()) return;
     pressLever(dir > 0 ? el.btnUp : el.btnDown);
     if (setLevel(S.level + dir)) afterMove();
   }
@@ -1067,7 +1074,7 @@
   }
 
   function pressKey(k) {
-    if (!S.padLive || S.reviewing) return;
+    if (!S.padLive || holding()) return;
     resetIdle();
     applyKey(k);
     previewEntry();
@@ -1105,7 +1112,7 @@
     entryDisplay();
   }
   function backspace() {
-    if (!S.padLive || S.reviewing) return;
+    if (!S.padLive || holding()) return;
     resetIdle();
     FX.sfx("key", 0.8);
     S.entry = S.entry.slice(0, -1);
@@ -1113,7 +1120,7 @@
     previewEntry();
   }
   function checkEntry() {
-    if (!S.padLive || S.reviewing) return;
+    if (!S.padLive || holding()) return;
     const m = /^([+-]?)(\d+)$/.exec(S.entry);
     if (S.phase !== "entry") {                               // a line is still playing ("Correct!", the instruction):
       FX.sfx("button");                                      // end it and check straight after
@@ -1162,7 +1169,7 @@
   el.btnClear.addEventListener("pointerdown", (e) => { e.stopPropagation(); backspace(); });
   el.btnCheck.addEventListener("pointerdown", (e) => { e.stopPropagation(); checkEntry(); });
   window.addEventListener("keydown", (e) => {
-    if (!S.padLive || S.reviewing) return;
+    if (!S.padLive || holding()) return;
     if (/^[0-9]$/.test(e.key)) pressKey(e.key);
     else if (e.key === "+" || e.key === "-") pressKey(e.key);
     else if (e.key === "Backspace") backspace();
@@ -1804,13 +1811,16 @@
     S.q = null; S.part = null; S.guided = false;
     focusOn(null);
     S.phase = "narrate";
+    S.inScene = true; S.backReq = false;
     const first = el.story.classList.contains("hidden");
     el.story.classList.remove("hidden");
-    // cross-fade to the new scene (a repeated scene stays, only its highlights restart)
+    // cross-fade to the new scene (a repeated scene stays, only its highlights restart;
+    // after ⏮ it cross-fades anyway, so the camera starts again from its first frame)
     const cur = el.shots[shotIdx];
     const src = `assets/story/scene-${step.scene}.jpg`;
     let shot = cur;
-    if (!cur.classList.contains("on") || !cur.querySelector("img").src.endsWith(src)) {
+    if (S.sceneSwap || !cur.classList.contains("on") || !cur.querySelector("img").src.endsWith(src)) {
+      S.sceneSwap = false;
       shot = el.shots[shotIdx = 1 - shotIdx];
       shot.querySelector("img").src = src;
       shot.getAnimations().forEach((a) => a.cancel());
@@ -1836,6 +1846,7 @@
     setSpeaker(step.speaker);
     el.caption.classList.remove("on"); el.bubble.classList.remove("on");
     await FX.sleep(first ? 500 : 450);
+    if (S.backReq) return sceneBack();
     if (step.caption) {
       el.caption.textContent = step.ost;
       el.caption.classList.add("on");
@@ -1864,6 +1875,7 @@
         const neg = typeof g === "number" ? g < 0 : y > 600;
         if (tank && step.tank.to == null) await FX.sleep(setTankLevel(tank, g));   // the water reaches the mark, then it lights
         if (lever) { lever.style.top = y + "px"; await FX.sleep(300); }
+        if (S.backReq) return;
         const d = document.createElement("div");
         d.className = "spot" + (neg ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
         spots.appendChild(d);
@@ -1871,6 +1883,7 @@
         FX.sfx("tick");
         await FX.sleep(520);
       }
+      if (S.backReq) return;
       if (step.sign) {
         const g = document.createElement("div");
         g.className = "sign " + (step.sign.text === "+" ? "plus" : "minus");
@@ -1882,18 +1895,29 @@
       }
     })();
 
-    await Promise.all([speak(step.vo), lights, step.fx ? sayFx(step) : null]);     // the line always plays to the end
+    await Promise.all([speak(step.vo), lights, step.fx ? sayFx(step) : null]);     // the line plays to the end (or until ⏮)
+    if (S.backReq) return sceneBack();
     await FX.sleep(700);
+    if (S.backReq) return sceneBack();
     el.bubble.classList.remove("on");
     el.caption.classList.remove("on");
     await FX.sleep(250);
+    S.inScene = false;
     S.phase = "idle";
+  }
+  /** ⏮ during a scene: its words go, and run() plays the scene before it (cross-faded in). */
+  function sceneBack() {
+    el.bubble.classList.remove("on");
+    el.caption.classList.remove("on");
+    S.inScene = false; S.backReq = false; S.sceneSwap = true;
+    S.phase = "idle";
+    return "back";
   }
 
   /* Chapter break (story ↔ game): water floods up from the bottom of the screen, a
      title card (the CSV section name) floats up in it, then the water drains away and
      reveals what was set up underneath. `tap`: the learner presses ▶ to go on. */
-  async function floodWipe(title, { tap = false, during = null } = {}) {
+  async function floodWipe(title, { tap = false, during = null, undo = null } = {}) {
     const f = el.flood, water = f.querySelector(".flood-water"), card = f.querySelector(".flood-card");
     const go = f.querySelector("#floodGo");
     card.querySelector("h2").textContent = title || "";
@@ -1909,10 +1933,15 @@
     FX.sfx("bubbles");
     if (during) await during();                                          // what comes next is set up under the water
     if (title) card.classList.add("on");
+    let choice = "go";
     if (tap) {
       await FX.sleep(500);
       go.focus({ preventScroll: true });
-      await new Promise((r) => { go.onclick = () => { go.onclick = null; FX.sfx("button"); r(); }; });
+      choice = await new Promise((r) => {
+        go.onclick = () => { go.onclick = null; S.floodBack = null; FX.sfx("button"); r("go"); };
+        if (undo) S.floodBack = () => { go.onclick = null; S.floodBack = null; r("back"); };   // ⏮ (story)
+      });
+      if (choice === "back") undo();                                     // what was there comes back under the water
     } else await FX.sleep(title ? 1900 : 450);
     if (title) { card.classList.replace("on", "away"); await FX.sleep(350); }   // the card floats off
     FX.sfxLoop("drain", 1200);
@@ -1921,17 +1950,26 @@
     f.classList.add("hidden");
     card.classList.remove("away");
     water.getAnimations().forEach((a) => a.cancel());
+    return choice;
   }
 
-  /** Story → game: the screen floods, "How to Play" (tap ▶), and the game appears as it drains. */
+  /** Story → game: the screen floods, "How to Play" (tap ▶), and the game appears as it drains.
+      ⏮ on the card instead: the last scene comes back as the water drains, and plays again
+      (returns "back"). */
   async function storyExit(next) {
     el.bubble.classList.remove("on"); el.caption.classList.remove("on");
-    await floodWipe(DATA.ui.howTo, {
+    el.stage.classList.add("in-story");                // the story's ⏮ still works on the card
+    return floodWipe(DATA.ui.howTo, {
       tap: true,
       during: async () => {
         if (next) { setSpeaker(next.speaker); setBanner(firstLine(next), "happy"); }   // the game's first line is already up
         el.story.classList.add("hidden");
         el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
+      },
+      undo: () => {
+        el.story.classList.remove("hidden");
+        el.shots[shotIdx].classList.add("on");
+        S.sceneSwap = true;
       }
     });
   }
@@ -2007,7 +2045,7 @@
   // "Learner observes and taps to continue." — a tap anywhere on the game, including
   // the keypad (capture phase, before the keys stop the event); HUD/QA controls excluded
   el.stage.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("#btnMute, #btnJump, #btnBack, #review, #jumper, #paused")) return;
+    if (e.target.closest("#btnMute, #btnJump, #btnBack, #btnStoryBack, #btnPause, #review, #jumper, #paused")) return;
     if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   }, true);
 
@@ -2033,11 +2071,11 @@
   }
   let revAt = 0;
   function openReview() {
-    if (!said.length || S.reviewing) return;
+    if (!said.length || holding()) return;
     FX.sfx("button");
     S.reviewing = true;
     stopIdle();
-    FX.hold(true);                                   // the line playing now stops; it starts again on ✕
+    FX.hold("review", true);                         // the line playing now stops; it starts again on ✕
     el.review.classList.remove("hidden");
     showReview(said.length - 1);
     el.revClose.focus({ preventScroll: true });     // keys go to the card, not the marker
@@ -2065,7 +2103,7 @@
     FX.previewStop();
     el.review.classList.add("hidden");
     S.reviewing = false;
-    FX.hold(false);
+    FX.hold("review", false);
     resetIdle();
   }
   const tapOnly = (node, f) => node.addEventListener("pointerdown", (e) => { e.stopPropagation(); e.preventDefault(); f(e); });
@@ -2082,6 +2120,56 @@
     else if (e.key === "ArrowRight") showReview(revAt + 1);
     else return;
     e.preventDefault();
+  });
+
+  /* =================================================================
+     ⏸ Pause (HUD, story and game) and ⏮ story back (2026-10-13: "add a pause and back
+     button in the story if the user misses any step").
+     ⏸ freezes everything where it is: the voice stops (the line starts again from its
+     beginning on ▶, like after leaving the tab), every animation (camera, water, lights)
+     stands still and every FX.sleep waits. A big ▶ (or a tap anywhere) plays on.
+     ⏮ in a story scene stops it and plays the scene before it, words, voice and all
+     (the first scene of a run starts again); on the "How to Play" card it brings the last
+     scene back. In the game the same slot holds 💬 look back.
+     ================================================================= */
+  let frozen = [];
+  function pauseGame() {
+    if (holding()) return;
+    FX.sfx("button");
+    S.paused = true;
+    stopIdle();
+    frozen = document.getAnimations().filter((a) => a.playState === "running");
+    frozen.forEach((a) => a.pause());
+    FX.hold("pause", true);
+    el.paused.classList.add("user");
+    el.paused.classList.remove("hidden");
+    el.btnResume.focus({ preventScroll: true });   // keys go to ▶, not the marker
+  }
+  function resumeGame() {
+    if (!S.paused) return;
+    S.paused = false;
+    el.paused.classList.add("hidden");
+    el.paused.classList.remove("user");
+    frozen.forEach((a) => { try { a.play(); } catch (e) {} });
+    frozen = [];
+    FX.hold("pause", false);
+    FX.sfx("button");
+    resetIdle();
+  }
+  function storyBack() {
+    if (holding()) return;
+    if (S.floodBack) { FX.sfx("button"); S.floodBack(); return; }
+    if (!S.inScene || S.backReq) return;
+    FX.sfx("button");
+    S.backReq = true;
+    FX.endLine();                                  // the line stops; runScene() hands over to the scene before
+  }
+  tapOnly(el.btnPause, () => (S.paused ? resumeGame() : pauseGame()));   // ⏸ again plays on too
+  tapOnly(el.btnStoryBack, storyBack);
+  el.paused.addEventListener("pointerdown", (e) => { if (S.paused) { e.stopPropagation(); e.preventDefault(); resumeGame(); } });
+  el.btnResume.addEventListener("click", resumeGame);   // Enter / Space on the focused ▶
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && S.paused) { e.preventDefault(); resumeGame(); }
   });
 
   /* =================================================================
@@ -2178,22 +2266,28 @@
      ================================================================= */
   async function run() {
     let prev = null;
-    for (const step of DATA.steps.slice(START_INDEX)) {
-      if (prev && prev.section === "story" && step.section !== "story") await storyExit(step);   // story → game
-      else if (prev && prev.type !== "scene" && step.type === "scene") await storyEnter(step);   // game → story (Story End)
+    // ⏮ in the story: the scene before (or this one again, at the start of a run of scenes)
+    const sceneBefore = (i) => (i > 0 && DATA.steps[i - 1].type === "scene" ? i - 1 : i);
+    for (let i = START_INDEX; i < DATA.steps.length; i++) {
+      const step = DATA.steps[i];
+      if (prev && prev.section === "story" && step.section !== "story") {      // story → game
+        if (await storyExit(step) === "back") { i -= 2; continue; }             // ⏮ on the "How to Play" card: the last scene again
+      } else if (prev && prev.type !== "scene" && step.type === "scene") await storyEnter(step);   // game → story (Story End)
       else if (prev && levelOf(step) !== levelOf(prev)) await levelWipe(step);           // dive between levels
       const flip = !!prev && prev.type === "question" && step.type === "question" && prev.section === step.section;
       prev = step;
       S.stepId = step.id;                                 // the language button reloads at this step
       S.section = step.section;                           // config.voicePace
+      el.stage.classList.toggle("in-story", step.type === "scene");   // story: ⏮ goes back a scene (the game: 💬 look back)
       if (step.type === "question") await runQuestion(step, { flip });
       else if (step.type === "gate") await runGate(step);
       else if (step.type === "demo") await runDemo(step);
       else if (step.type === "say") await runSay(step);
-      else if (step.type === "scene") await runScene(step);
+      else if (step.type === "scene" && await runScene(step) === "back") i = sceneBefore(i) - 1;
     }
     // End
     focusOn(null);
+    el.stage.classList.remove("playing", "in-story");   // no ⏸ / back on the end screen
     el.endScreen.classList.remove("hidden");             // the cover art again, with the badge
     el.confetti.style.zIndex = 96;                       // confetti over the end screen
     FX.confetti(el.confetti, { count: 260, x: 960, y: 420, power: 1.3, spread: 1.4 });
@@ -2227,6 +2321,7 @@
       FX.unlockSfx();
       FX.startMusic();   // background music starts with the game
       setTimeout(() => FX.sfx("button"), 60);  // after the unlock (which briefly plays everything at volume 0)
+      el.stage.classList.add("playing");             // ⏸ and back appear with the game
       el.startScreen.classList.add("fade");
       setTimeout(() => el.startScreen.classList.add("hidden"), 500);
       run();

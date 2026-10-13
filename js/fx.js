@@ -8,9 +8,11 @@
   const FX = {};
 
   /* ---------- timing ---------- */
-  /* FX.hold(true) pauses the game (the look-back card, game.js): the current line is cut
-     and starts again when the hold ends, and every FX.sleep waits at its end until then. */
+  /* FX.hold(key, true) pauses the game (game.js: the ⏸ button, the look-back card): the
+     current line is cut and starts again when the hold ends, and every FX.sleep waits at its
+     end until then. Each key holds on its own; the game goes on when none is left. */
   let held = false, heldSince = 0;
+  const holders = new Set();
   const holdWaiters = [];
   FX.heldMs = 0;                                   // total time spent held (timeouts can leave it out)
   FX.sleep = async (ms) => {
@@ -92,11 +94,11 @@
      when the learner comes back, that line starts again from the beginning. */
   let blurred = false;
   const isAway = () => document.hidden || blurred || held;
-  FX.hold = (on) => {
-    on = !!on;
-    if (on === held) return;
-    held = on;
-    if (on) heldSince = performance.now();
+  FX.hold = (key, on) => {
+    if (on) holders.add(key); else holders.delete(key);
+    if ((holders.size > 0) === held) return;
+    held = holders.size > 0;
+    if (held) heldSince = performance.now();
     else {
       FX.heldMs += performance.now() - heldSince;
       holdWaiters.splice(0).forEach((r) => r());

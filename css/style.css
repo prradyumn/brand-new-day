@@ -890,7 +890,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 /* Narrator line: text straight on the scene (as dialogue_p01), with a soft light halo for legibility */
 #caption {
-  position: absolute; left: 230px; right: 230px; top: 30px; margin: 0; text-align: center;   /* clear of the ⏭ 🔊 buttons */
+  position: absolute; left: 120px; right: 120px; top: 122px; margin: 0; text-align: center;   /* under the HUD row (⏸ ⏮ हिंदी ⏭ 🔊) */
   font-size: 46px; font-weight: 700; line-height: 1.22; color: #111;
   text-shadow: 0 0 4px #fff, 0 0 10px rgba(255, 255, 255, .95), 0 0 22px rgba(255, 255, 255, .8), 0 0 36px rgba(255, 255, 255, .6);
   opacity: 0; transform: translateY(-12px); transition: opacity .5s, transform .5s var(--ease-out);
@@ -907,8 +907,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 #btnMute { left: 1824px; top: 22px; }
 /* Look back (game.js): a speech bubble with a back arrow; dim until something has been said */
-#btnBack { left: 1500px; top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
-#btnBack svg { width: 48px; height: 48px; display: block; }
+#btnBack, #btnStoryBack { left: 1500px; top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
+#btnPause { left: 1406px; top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
+#btnBack svg, #btnStoryBack svg, #btnPause svg { width: 48px; height: 48px; display: block; }
+/* ⏸ and back only while the game runs (not on the cover or the end screen); the story has ⏮
+   (back a scene), the game 💬 (look back at the lines) in the same place */
+#stage:not(.playing) :is(#btnPause, #btnBack, #btnStoryBack),
+#stage.in-story #btnBack, #stage:not(.in-story) #btnStoryBack { display: none; }
 #btnBack.off { opacity: .4; pointer-events: none; }
 #review {
   inset: 0; width: 1920px; height: 1080px; z-index: 97;
@@ -1019,13 +1024,16 @@ button { font-family: inherit; cursor: pointer; }
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   cursor: pointer;
 }
-#paused > div {
+#paused .paused-icon, #btnResume {
   width: 220px; height: 220px; border-radius: 50%;
   display: grid; place-items: center;
   background: #fff8e1; box-shadow: 0 14px 40px rgba(0,0,0,.35);
   color: var(--navy); font-size: 110px; line-height: 1;
   animation: pulseSoft 1.6s ease-in-out infinite;
 }
+#btnResume { border: 0; padding: 0; box-shadow: inset 0 0 0 8px #ffd34d, 0 14px 40px rgba(0,0,0,.35); }
+#btnResume svg { width: 130px; height: 130px; margin-left: 14px; }
+#paused:not(.user) #btnResume, #paused.user .paused-icon { display: none; }
 
 
 /* ---------------- Keyframes ---------------- */
