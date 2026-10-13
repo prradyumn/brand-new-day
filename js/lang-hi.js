@@ -40,41 +40,35 @@
        the number appear together on "3 स्तर" */
     cues: { dir: null, levels: "{n} स्तर" },
 
-    /* per-step cue words that live inside the Hindi lines (teaching rows P3–P6) */
+    /* per-step cue words that live inside the Hindi lines (teaching rows P2, P3). Hindi says
+       the number before the verb ("2 स्तर बढ़ता है"), so the sign comes with the number */
     steps: {
-      P3: { build: { a: "+1", op: "बढ़कर", b: "2 स्तर" } },
-      P4: { opGlow: "जोड़ते", moveAt: "नया" },
-      P5: { build: { a: "+3", op: "घटकर", b: "5 स्तर" } },
-      P6: { opGlow: "घटाते", moveAt: "नया" }
+      P2: { build: { a: "+1", op: "2 स्तर", b: "2 स्तर", ans: "पहुँच" } },
+      P3: { build: { a: "+3", op: "5 स्तर", b: "5 स्तर", ans: "पहुँच" } }
     },
 
     exact: {
       /* ---- Story ---- */
-      "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working.":
-        "गाँव के लोग एक बड़ी टंकी में पानी जमा करते हैं। लेकिन आज, पानी का स्तर अपने-आप पढ़ने वाली मशीन ने काम करना बंद कर दिया है।",
+      "The villagers store water in a tank. But today, the automatic system that checks the water level has stopped working.":
+        "गाँव के लोग एक टंकी में पानी जमा करते हैं। लेकिन आज, पानी का स्तर अपने-आप जाँचने वाली मशीन ने काम करना बंद कर दिया है।",
       "Pari, can you help me mark the water levels?": "परी, क्या तुम पानी के स्तर पर निशान लगाने में मेरी मदद करोगी?",
-      "Yes! Let’s fix it.": "हाँ! चलो, इसे ठीक करते हैं।",
-      "Look Pari, 0 shows the water level we need.": "देखो परी, 0 वह पानी का स्तर दिखाता है जितना हमें चाहिए।",
-      "Above 0, there is more water than required.": "0 से ऊपर, ज़रूरत से ज़्यादा पानी है।",
-      "Above 0, there is more water than requirement.": "0 से ऊपर, ज़रूरत से ज़्यादा पानी है।",
-      "Below 0, there is less water than required.": "0 से नीचे, ज़रूरत से कम पानी है।",
-      "Below 0, there is less water than requirement.": "0 से नीचे, ज़रूरत से कम पानी है।",
+      "Yes! Let’s mark them.": "हाँ! चलो, निशान लगाते हैं।",
+      "Look Pari, we’ll use 0 as the reference point to mark the water levels.":
+        "देखो परी, पानी के स्तरों पर निशान लगाने के लिए हम 0 को संदर्भ बिंदु मानेंगे।",
+      "Above 0, means there is more water than requirement.": "0 से ऊपर का मतलब है, ज़रूरत से ज़्यादा पानी है।",
+      "Below 0, means there is less water.": "0 से नीचे का मतलब है, पानी कम है।",
       "Now notice this, numbers above 0 are positive numbers.": "अब यह ध्यान दो, 0 से ऊपर की संख्याएँ धनात्मक संख्याएँ हैं।",
       "And, numbers below 0 are negative numbers.": "और, 0 से नीचे की संख्याएँ ऋणात्मक संख्याएँ हैं।",
-      "Oh! so, below 0 is negative, and above 0 is positive!": "अरे! तो 0 से नीचे ऋणात्मक है, और 0 से ऊपर धनात्मक!",
-      "Correct, Let’s mark the correct water level now.": "सही! चलो, अब पानी के सही स्तर पर निशान लगाते हैं।",
+      "Oh! so, above 0 is positive number and below 0 is negative number.":
+        "अरे! तो 0 से ऊपर धनात्मक संख्या है और 0 से नीचे ऋणात्मक संख्या।",
+      "Correct, Let’s mark the correct water level.": "सही! चलो, पानी के सही स्तर पर निशान लगाते हैं।",
 
       /* ---- How to Play ---- */
-      "Move the lever up or down as necessary. Like water rises 2 levels up.":
-        "ज़रूरत के हिसाब से लीवर को ऊपर या नीचे करो। जैसे, पानी 2 स्तर ऊपर बढ़ता है।",
-      "Move the lever up or down.\nMove the lever 2 levels up.": "लीवर को ऊपर या नीचे करो।\nलीवर को 2 स्तर ऊपर करो।",
+      "Move the lever up or down.": "लीवर को ऊपर या नीचे करो।",
       "Mark the correct water level.": "पानी के सही स्तर पर निशान लगाओ।",
-      "Now enter the new water level.": "अब पानी का नया स्तर डालो।",
-      "Now, enter the new water level.": "अब, पानी का नया स्तर डालो।",
-      "Choose the correct sign for the water level.": "पानी के स्तर के लिए सही चिह्न चुनो।",
       "Choose the correct sign.": "सही चिह्न चुनो।",
-      "Great! You marked the water level correctly.": "बहुत बढ़िया! तुमने पानी के स्तर पर सही निशान लगाया।",
-      "Check the water level marked.": "लगाया गया निशान जाँचो।",
+      "And enter the new water level.": "और पानी का नया स्तर डालो।",
+      "Click on Check": "जाँचो पर क्लिक करो",
 
       /* ---- Level 1 ---- */
       "Find the mark 0.": "0 का निशान ढूँढो।",
@@ -100,23 +94,17 @@
       "Look at the number beside the marker.": "मार्कर के पास वाली संख्या देखो।",
 
       /* ---- Level 2 teaching ---- */
-      "I noticed something! When the water level rises, we add to the current level.":
-        "मैंने कुछ देखा! जब पानी का स्तर बढ़ता है, तो हम अभी के स्तर में जोड़ते हैं।",
-      "Water level rises → Add": "पानी का स्तर बढ़ा → जोड़ो",
-      "And when the water level goes down, we subtract from the current level.":
-        "और जब पानी का स्तर घटता है, तो हम अभी के स्तर में से घटाते हैं।",
-      "Water level goes down → Subtract": "पानी का स्तर घटा → घटाओ",
-      "Correct, Pari! If the water level is at +1 and rises by 2 levels, ":
-        "सही, परी! अगर पानी का स्तर +1 पर है और बढ़कर 2 स्तर ऊपर जाता है, ",
-      "We add and the new water level is +3.": "हम जोड़ते हैं, और पानी का नया स्तर +3 है।",
-      "Now, if the water level is at +3 and goes down by 5 levels.":
-        "अब, अगर पानी का स्तर +3 पर है और घटकर 5 स्तर नीचे जाता है।",
-      "We subtract and the new water level is −2.": "हम घटाते हैं, और पानी का नया स्तर −2 है।",
-      "Got it! When the level rises, we add. When it goes down, we subtract.":
-        "समझ गई! जब स्तर बढ़ता है, हम जोड़ते हैं। जब घटता है, हम घटाते हैं।",
-      "Rise → Add • Go down → Subtract": "बढ़ा → जोड़ो • घटा → घटाओ",
-      "Let’s calculate the water levels exactly.": "चलो, पानी के स्तरों का सही हिसाब लगाते हैं।",
+      "Pari! Let’s see where the water level reaches this time.": "परी! चलो देखते हैं, इस बार पानी का स्तर कहाँ तक पहुँचता है।",
+      "Let’s track the water level!": "चलो, पानी के स्तर पर नज़र रखें!",
+      "If the water level is at +1 and rises by 2 levels, it reaches +3.":
+        "अगर पानी का स्तर +1 पर है और 2 स्तर बढ़ता है, तो यह +3 पर पहुँच जाता है।",
+      "Now, if the water level is at +3 and goes down by 5 levels, it reaches −2.":
+        "अब, अगर पानी का स्तर +3 पर है और 5 स्तर नीचे जाता है, तो यह −2 पर पहुँच जाता है।",
+      "Oh! Got it! When the level rises, we add. When it goes down, we subtract.":
+        "अरे! समझ गई! जब स्तर बढ़ता है, हम जोड़ते हैं। जब घटता है, हम घटाते हैं।",
+      "Rises → Add\nGoes Down → Subtract": "बढ़े → जोड़ो\nघटे → घटाओ",
       "Let’s calculate the water levels exactly!": "चलो, पानी के स्तरों का सही हिसाब लगाते हैं!",
+      "Calculate the Water Level!": "पानी का स्तर निकालो!",
       "Let’s find the new water level.": "चलो, पानी का नया स्तर ढूँढते हैं।",
 
       /* ---- Level 2 game ---- */
@@ -157,7 +145,8 @@
       "So integers helped us show water levels below 0, at 0, and above 0!":
         "तो पूर्णांकों ने हमें 0 से नीचे, 0 पर और 0 से ऊपर के पानी के स्तर दिखाने में मदद की!",
       "Excellent! You’re an Integers Expert now!": "शानदार! अब तुम पूर्णांकों के विशेषज्ञ हो!",
-      "Excellent! You’re a Water Level Expert now!": "शानदार! अब तुम पानी के स्तर के विशेषज्ञ हो!"
+      "Excellent! You’re a Water Level Expert now!": "शानदार! अब तुम पानी के स्तर के विशेषज्ञ हो!",
+      "Well Done!": "शाबाश!"
     },
 
     /* [English pattern, (match, translate) → Hindi] — the repeated lines that differ only by numbers */

@@ -1,6 +1,6 @@
 /* =====================================================================
    Integers: Rise and Fall — game script (content only, no logic)
-   Source: "Integers_Rise and Fall - Story n Game V3.csv": the story
+   Source: "Integers_Rise and Fall - Story V3.csv" (2026-10-13) and "Game V3 (2).csv": the story
    (Intro, Teaching, Game start), How to Play, Level 1, Level 2 transition
    + game, Level 3 transition + game, Story End.
    Every line of text below is copied from the CSV (speaker labels and
@@ -79,8 +79,8 @@ window.GAME_DATA = {
        fx:     "celebrate" (confetti) or "badge" (completion badge) while the line plays */
     { type: "scene", id: "ST1", section: "story", speaker: "narrator", scene: "p01", caption: true,
       camera: { to: 1.14, x: 580, y: 520 },                                // Wide view of the village. Camera moves towards the large water tank.
-      vo: "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working.",
-      ost: "The villagers store water in a big tank. But today, the automatic water-level reading system has stopped working." },
+      vo: "The villagers store water in a tank. But today, the automatic system that checks the water level has stopped working.",
+      ost: "The villagers store water in a tank. But today, the automatic system that checks the water level has stopped working." },   // (sheet OST "—": shown as the narrator's caption)
     { type: "scene", id: "ST2", section: "story", scene: "p02",
       camera: { to: 1.05, x: 1045, y: 560 },                               // Camera moves closer to the tank. Guddu Bhaiya and Pari stand beside it.
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
@@ -88,25 +88,25 @@ window.GAME_DATA = {
       ost: "Pari, can you help me mark the water levels?" },
     { type: "scene", id: "ST3", section: "story", speaker: "pari", scene: "p03",   // Pari looks at Guddu Bhaiya and agrees to help.
       bubble: { shape: "round", tail: "left", w: 520, tip: [1440, 468] },
-      vo: "Yes! Let’s fix it.",
-      ost: "Yes! Let’s fix it." },
+      vo: "Yes! Let’s mark them.",
+      ost: "Yes! Let’s mark them." },
     { type: "scene", id: "ST4", section: "story", scene: "p06",
       glow: [[757, 575]],                                                  // Close-up of the water-level scale. The 0 level glows first.
       bubble: { shape: "wide", tail: "left", w: 560, tip: [600, 255] },
-      vo: "Look Pari, 0 shows the water level we need.",
-      ost: "Look Pari, 0 shows the water level we need." },
+      vo: "Look Pari, we’ll use 0 as the reference point to mark the water levels.",
+      ost: "Look Pari, we’ll use 0 as the reference point to mark the water levels." },   // the bubble shows the spoken line (sheet OST, the old line: "0 shows the water level we need.")
     { type: "scene", id: "ST5", section: "story", scene: "p07e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 are highlighted one by one. Camera moves upward.
       glow: [1, 2, 3],                                                     // the water rises to each mark, then it lights
       bubble: { shape: "wide", tail: "right", w: 520, tip: [495, 300] },
-      vo: "Above 0, there is more water than required.",
-      ost: "Above 0, there is more water than required." },          // voice and screen agree (sheet OST: "requirement")
+      vo: "Above 0, means there is more water than requirement.",
+      ost: "Above 0, means there is more water than requirement." },
     { type: "scene", id: "ST6", section: "story", scene: "p08e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 850 },                                // Levels below 0 are highlighted one by one. Camera moves downward.
       glow: [-1, -2, -3],                                                  // the water falls to each mark, then it lights
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
-      vo: "Below 0, there is less water than required.",
-      ost: "Below 0, there is less water than required." },          // voice and screen agree (sheet OST: "requirement")
+      vo: "Below 0, means there is less water.",
+      ost: "Below 0, means there is less water." },
     { type: "scene", id: "ST7", section: "story", scene: "p07e", tank: { from: 0 },
       camera: { to: 1.05, x: 960, y: 250 },                                // Levels above 0 highlighted one by one, plus sign.
       glow: [1, 2, 3], sign: { text: "+", x: 1100, y: 395 },
@@ -120,24 +120,24 @@ window.GAME_DATA = {
       vo: "And, numbers below 0 are negative numbers.",
       ost: "And, numbers below 0 are negative numbers." },
     { type: "scene", id: "ST9", section: "story", speaker: "pari", scene: "p10e", tank: { from: 0, to: 0 },   // Full scale: negative numbers, 0, positive numbers. Pari responds.
-      glow: [-1, -2, -3, 0, 1, 2, 3],                                       // the water returns to 0 while the marks light
+      glow: [1, 2, 3, 0, -1, -2, -3],                                       // in the line's order (above 0, then below); the water stays at 0
       bubble: { shape: "round", tail: "left", w: 560, tip: [1440, 470] },
-      vo: "Oh! so, below 0 is negative, and above 0 is positive!",
-      ost: "Oh! so, below 0 is negative, and above 0 is positive!" },
+      vo: "Oh! so, above 0 is positive number and below 0 is negative number.",
+      ost: "Oh! so, above 0 is positive number and below 0 is negative number." },
     { type: "scene", id: "ST10", section: "story", scene: "p04",
       glow: [[930, 553]],                                                  // Camera returns to the full tank and lever. The 0 mark glows.
       bubble: { shape: "wide", tail: "right", w: 520, tip: [505, 318] },
-      vo: "Correct, Let’s mark the correct water level now.",
-      ost: "Correct, Let’s mark the correct water level now." },
+      vo: "Correct, Let’s mark the correct water level.",
+      ost: "Correct, Let’s mark the correct water level." },
 
     /* ======================= HOW TO PLAY (guided demo) ======================= */
     {
-      // The CSV gives this line to the Narrator; Guddu says it (2026-10-08) so a face is in the
+      // The sheet gives this line to the Narrator; Guddu says it (2026-10-08) so a face is in the
       // narrator box from the first line and one host presents all of How to Play.
       type: "demo", id: "H1", section: "howto", guided: true, pose: "point",
-      act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0. The "2 levels up" example is shown in H2 (+2 → +4)
-      vo: "Move the lever up or down as necessary. Like water rises 2 levels up.",
-      ost: "Move the lever up or down.\nMove the lever 2 levels up."
+      act: "leverUpDown", start: 2, taps: [1, -1],     // "Game start" row: the lever is positioned above 0
+      vo: "Move the lever up or down.",
+      ost: "Move the lever up or down."
     },
     {
       type: "demo", id: "H2", section: "howto", guided: true,
@@ -150,20 +150,20 @@ window.GAME_DATA = {
     {
       type: "demo", id: "H3", section: "howto", guided: true,
       act: "chooseSign", key: "+", pose: "point",       // Camera shifts to the dial and display. "Plus and minus sign buttons are highlighted."
-      vo: "Choose the correct sign for the water level.",
+      vo: "Choose the correct sign.",
       ost: "Choose the correct sign."
     },
     {
       type: "demo", id: "H4", section: "howto", guided: true,
       act: "enterNumber", key: "4", pose: "point",      // the number buttons
-      vo: "Now enter the new water level.",
-      ost: "Now, enter the new water level."
+      vo: "And enter the new water level.",
+      ost: "And enter the new water level."
     },
     {
       type: "demo", id: "H5", section: "howto", guided: true,
-      act: "check", ostFirst: true, pose: "thumbs",     // "Check icon glows … Both glow and a tick appears."
-      vo: "Great! You marked the water level correctly.",
-      ost: "Check the water level marked."
+      act: "check", pose: "point",                      // "Check icon glows … Both glow and a tick appears."
+      vo: "Click on Check",
+      ost: "Click on Check"
     },
 
     /* ======================= LEVEL 1 =======================
@@ -213,40 +213,29 @@ window.GAME_DATA = {
     q1("Q5", -1,  3, "The water level rises 4 levels. Move the marker to the correct water level.",      "glowDirUp",   "pulseMarkerZero"),   // Up arrow extends through 0.
     q1("Q6",  3, -2, "The water level falls 5 levels. Move the marker to the correct water level.",      "glowDirDown", "pulseMarkerScale"),
 
-    /* ============== LEVEL 2 TRANSITION (teaching) ============== */
-    { type: "say", id: "P1", section: "level2", speaker: "pari", level: 2,
-      vo: "I noticed something! When the water level rises, we add to the current level.",
-      ost: "Water level rises → Add" },                                  // Full water-level scale is visible. (OST in the narrator box)
-    { type: "say", id: "P2", section: "level2", speaker: "pari", level: 2,
-      fx: "moveTo", to: 1,                                               // The lever moves slightly downward.
-      vo: "And when the water level goes down, we subtract from the current level.",
-      ost: "Water level goes down → Subtract" },
-    { type: "say", id: "P3", section: "level2", level: 1, ostIn: "eq",
-      fx: "countSteps", from: 1, to: 3,                                  // Lever starts at +1. Two levels above it highlight one by one.
-      build: { a: "+1", op: "rises", b: "2 levels" },                    // the equation is written with the line: 1 → + → 2 (counted 1, 2) → = ?
-      vo: "Correct, Pari! If the water level is at +1 and rises by 2 levels, ",
-      ost: "1 + 2 = ?" },
-    { type: "say", id: "P4", section: "level2", level: 1, ostIn: "eq", ostAfter: true,
-      fx: "moveTo", to: 3, opGlow: "add", moveAt: "new water level",     // Lever moves +1 → +2 → +3. The equation completes.
-      vo: "We add and the new water level is +3.",
-      ost: "1 + 2 = 3" },
-    { type: "say", id: "P5", section: "level2", level: 3, ostIn: "eq",
-      fx: "countSteps", from: 3, to: -2,                                 // Lever starts at +3. Five levels below it highlight one by one.
-      build: { a: "+3", op: "goes down", b: "5 levels" },
-      vo: "Now, if the water level is at +3 and goes down by 5 levels.",
-      ost: "3 − 5 = ?" },
-    { type: "say", id: "P6", section: "level2", level: 3, ostIn: "eq", ostAfter: true,
-      fx: "moveTo", to: -2, zeroGlow: true, opGlow: "subtract", moveAt: "new water level",   // +3 → … → −2, 0 highlighted while crossing.
-      vo: "We subtract and the new water level is −2.",
-      ost: "3 − 5 = −2" },
-    { type: "say", id: "P7", section: "level2", speaker: "pari", level: -2,
-      fx: "riseFall",                                                    // Up arrow, down arrow, plus and minus symbols.
-      vo: "Got it! When the level rises, we add. When it goes down, we subtract.",
-      ost: "Rise → Add • Go down → Subtract" },
+    /* ============== LEVEL 2 TRANSITION (teaching) ==============
+       Source: "Integers_Rise and Fall - Story V3.csv" (2026-10-13), Level 2 Transition rows 1–5. */
+    { type: "say", id: "P1", section: "level2", level: 1,               // Guddu Bhaiya turns toward Pari and points to the water-level scale.
+      vo: "Pari! Let’s see where the water level reaches this time.",
+      ost: "Let’s track the water level!" },
+    { type: "say", id: "P2", section: "level2", level: 1, ostIn: "eq",
+      fx: "countMove", to: 3,                                            // The marker starts at +1 and moves up two levels: +1 → +2 → +3. Each level glows as it moves.
+      build: { a: "+1", op: "rises", b: "2 levels", ans: "it reaches" }, // the equation is written with the line: (+1) → + → 2 (counted 1, 2 as the marker moves) → = +3
+      vo: "If the water level is at +1 and rises by 2 levels, it reaches +3.",
+      ost: "(+1) + 2 = +3" },
+    { type: "say", id: "P3", section: "level2", level: 3, ostIn: "eq",
+      fx: "countMove", to: -2, zeroGlow: true,                           // +3 → +2 → +1 → 0 → −1 → −2, each level highlights as the marker moves down.
+      build: { a: "+3", op: "goes down", b: "5 levels", ans: "it reaches" },
+      vo: "Now, if the water level is at +3 and goes down by 5 levels, it reaches −2.",
+      ost: "(+3) − 5 = −2" },
+    { type: "say", id: "P4", section: "level2", speaker: "pari", level: -2,
+      fx: "riseFall",                                                    // Pari gestures up for rising and down for falling. Up and down arrows, plus and minus signs.
+      vo: "Oh! Got it! When the level rises, we add. When it goes down, we subtract.",
+      ost: "Rises → Add\nGoes Down → Subtract" },
     {
-      type: "gate", id: "TR2", section: "level2",
-      vo: "Let’s calculate the water levels exactly.",
-      ost: "Let’s calculate the water levels exactly!",
+      type: "gate", id: "TR2", section: "level2", speaker: "pari",       // Pari turns excitedly toward the activity panel; the dial pad and the next challenge light up.
+      vo: "Let’s calculate the water levels exactly!",
+      ost: "Calculate the Water Level!",
       appear: "eqPanel", readEq: true,                                   // Equation panel appears beside the tank (the water goes to its start level); Guddu reads it.
       continueOnTap: true,                                               // Learner observes and taps to continue.
       idle: { text: "Let’s find the new water level.", fx: "pulseEqPanel" } // Equation panel gently pulses.
@@ -355,7 +344,8 @@ window.GAME_DATA = {
       camera: { to: 1.04, x: 960, y: 560 },
       bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
       vo: "We did it! We tracked every rise and fall in the water level.",
-      ost: "We did it! We tracked every rise and fall in the water level." },
+      ost: "We did it! We tracked every rise and fall in the water level.",   // in the bubble
+      board: "Well Done!" },                                                   // sheet OST: on the celebration board
     { type: "scene", id: "Z3", section: "end", scene: "p11",                                    // Camera focuses on the full scale: negative numbers, 0, positive numbers.
       camera: { to: 1.08, x: 920, y: 575 },
       glow: [[918, 653], [918, 743], [918, 842], [925, 553], [920, 482], [920, 400], [920, 310]],

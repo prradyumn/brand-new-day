@@ -751,6 +751,7 @@ button { font-family: inherit; cursor: pointer; }
   animation: badgePop 1.3s var(--ease-spring) forwards;
 }
 .cross-badge { background: radial-gradient(circle at 35% 30%, #ffb3a8, #ef4a3c 60%, #b7231a); box-shadow: 0 10px 30px rgba(0,0,0,.35); animation-duration: .9s; }
+#stage #markedBadge.story { left: 610px; top: 46px; z-index: 75; }   /* Story End Z2 "Well Done!": over the scene, top centre */
 #markedBadge {             /* sits over the number display, centred on it */
   left: 173.5px; top: 259.5px; width: 700px; height: 178px;
   background: url(../assets/board-green.png) center / 100% 100% no-repeat;

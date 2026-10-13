@@ -1,6 +1,6 @@
 # Integers: Rise and Fall — How to Play + Levels 1–3
 
-This is a plain HTML, CSS and JavaScript game with no build step and no libraries. It follows **"Integers_Rise and Fall - Story n Game V3.csv"** from the "How to Play" table onward: How to Play, Level 1, the Level 2 transition and game, the Level 3 transition and game, and the Story End. The intro/teaching story rows before "How to Play" are not part of the game. The layout matches **Figma → Integers → page "LBD" → Section 2** (Slide 16:9 – 16 / 18 / 19 / 20).
+This is a plain HTML, CSS and JavaScript game with no build step and no libraries. It follows **"Integers_Rise and Fall - Story V3.csv"** (2026-10-13: the story, How to Play, the Level 2 and Level 3 transitions and the Story End) and **"Integers_Rise and Fall - Game V3 (2).csv"** (Levels 1–3; the same as Game V3 (1)), word for word. The layout matches **Figma → Integers → page "LBD" → Section 2** (Slide 16:9 – 16 / 18 / 19 / 20).
 
 **Content rule:** every spoken line and every piece of on-screen text comes from the CSV (in Hindi: from its translation in `js/lang-hi.js`). `data.js` copies it verbatim, with speaker labels ("Guddu Bhaiya:") and quote marks removed. The engine adds no dialogue or captions of its own. Buttons use the CSV's "Start" or icons (▶ ↻ ⏸).
 
@@ -43,7 +43,7 @@ Script load order matters: `data.js` → `assets/vo/manifest.js` → `fx.js` →
 ## 2a. Languages: English and Hindi
 
 * **Choosing:** the हिंदी / English button (top right, `#btnLang`) switches language. It reloads the game at the same step (`?lang=hi&step=ID`, then press ▶, because browsers only allow speech after a tap). The choice is remembered (localStorage), and `?lang=en|hi` also works in a link.
-* **How it works:** `js/lang.js` runs before the game. For Hindi it swaps every line of `GAME_DATA` (VO, OST, correct and wrong lines, idle prompts, buttons, `ui`) for its Hindi line from `js/lang-hi.js`, so `game.js` runs exactly the same. The page's own text (title, Check) uses `data-i18n`. The equation cue words are per language too (`cues`, and `steps` for P3–P6).
+* **How it works:** `js/lang.js` runs before the game. For Hindi it swaps every line of `GAME_DATA` (VO, OST, correct and wrong lines, idle prompts, buttons, `ui`) for its Hindi line from `js/lang-hi.js`, so `game.js` runs exactly the same. The page's own text (title, Check) uses `data-i18n`. The equation cue words are per language too (`cues`, and `steps` for P2, P3).
 * **`js/lang-hi.js`:** `exact` holds the one-off lines and `patterns` the lines that differ only by their numbers. Equations ("(+4) + 3 = ?") stay as they are. A line with no translation is logged as `[lang] no translation for: …` and shows in English: add it to `lang-hi.js`. The current script translates completely.
 * **Hindi teaching choices** (the header of `lang-hi.js` has the full list):
   * Maths words as Hindi-medium textbooks use them: पूर्णांक, धनात्मक / ऋणात्मक संख्याएँ.
@@ -115,8 +115,9 @@ Start screen (▶ = user gesture, unlocks speech; the first story scene sits beh
                TR1    "Start" button → tank scale and dial become active
                Q1…Q6  0→+2, +2→+6, +6→+3, +3→−1, −1→+3, +3→−2   (marker, then keypad)
   ── dive ──
-  Level 2      P1–P7  teaching rows (Pari + Guddu): example equations (P3–P6) in the equation panel, lever demos
-               TR2    tap to continue; the water goes to 0, the equation panel shows 0 + 3 = ? and Guddu reads it
+  Level 2      P1–P4  teaching rows (Story V3): P1 "Let's see where the water level reaches", P2 (+1) + 2 = +3 and
+                      P3 (+3) − 5 = −2 written in the equation panel as the marker moves, P4 Pari "rises → add, goes down → subtract"
+               TR2    Pari: "Let's calculate the water levels exactly!" (OST "Calculate the Water Level!"); tap to continue; the water goes to 0, the equation panel shows 0 + 3 = ? and Guddu reads it
                A0     tutorial 0 + 3, no incorrect feedback
                A1…A6  (+2) + 3, (−2) + 4, (+3) − 5, (−2) − 3, (−5) + 2, (−3) − 4
                       (in A0–A6 the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3)
@@ -208,8 +209,7 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 
 **The equation builds in step with the voice-over** (`buildTeachEq()`, `buildQuestionEq()`, `untilWord()` in `game.js`).
 * Equation pieces wait hidden (`.eqhide` keeps their space, so nothing shifts) and pop in (`.eqpop`) on their word.
-* **Level 2 teaching (P3, P5):** "If the water level is at +1" → `1`, "and rises" → `+`, "by 2 levels" → the levels light up one by one and the number counts 1, 2 with them, then `= ?`. The cue words are in each row's `build: { a, op, b }`.
-* **P4 / P6:** the sign lights up on "add" / "subtract" (`opGlow`), the lever starts on "new water level" (`moveAt`), and the answer appears when it stops.
+* **Level 2 teaching (P2, P3, `buildMoveEq()`):** "If the water level is at +1" → `(+1)`, "and rises" → `+`, "by 2 levels" → the marker moves up level by level, each level glows and the number counts 1, 2 with it, then "it reaches +3" → `= +3` and the display shows +3. The cue words are in each row's `build: { a, op, b, ans }` (Hindi: `LANG_HI.steps`).
 * **Level 2/3 questions:** the start level comes up with the question. The sign appears on "rises" / "goes up" / "goes down", the number on "3 levels", then `= ?`. A0 and B1 skip this, because TR2 / R5 already show their equation.
 * **The equation is read aloud** (`readEq()`, 2026-10-12 review: "it should be reading the equation as well"). Each question has `eqVo`, its equation as written ("(+2) + 3 = ?"); Guddu reads it ("plus 2 plus 3 equals what?"; Hindi `"(+2) + 3 = कितना?"` → "धन 2 धन 3 बराबर कितना?") while the narrator box shows it and each card lights up on its word (`.eqread`). He reads it when the equation first appears (TR2 and R5, `readEq: true`; the water moves to the equation's start level first, so "0 + 3 = ?" is never shown beside the −2 of the last example) and in every inactivity reminder while the panel shows the question ("Let's find the new water level." … "0 + 3 = ?"). The clips are ordinary voice lines (`tools/generate-audio.mjs` reads `eqVo`; English and Hindi keys differ because the Hindi line ends in "कितना?").
 * **The equation follows the lever in all of Level 2** (`liveEq`, 2026-10-12 review: "the second number won't change with the movement of the lever"; the sheet only had it in the A0 tutorial): moved 2 up → "(+2) + 2", 2 down → "(+3) − 2". The sign shows the direction and the number is never negative (no "+ (−2)"). When the lever locks, the panel goes back to the question for the keypad step.
@@ -338,13 +338,15 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 * The Level 1 tutorial marker starts at +2 ("starts above 0").
 * **The equation panel only ever shows equations.** In the Level 2 teaching rows, the example equations ("1 + 2 = ?", "3 − 5 = −2", `ostIn: "eq"`) go in the panel, written as the CSV writes them. The word captions ("Water level rises → Add", "Rise → Add • Go down → Subtract") are shown in the narrator box after the line, like every other OST. Each piece of the equation sits on its own card in the cream strip, following the reference mock (`screen-mock-01.png`): white number cards, smaller cream cards for the signs, and a light-blue answer card with a blue outline. Card sizes are in `em`, so `fitEq()` shrinks the cards along with the font when an equation would overflow the strip. Only the widest one does: "(−2) + (−3) = ?" goes from 46 to 44 px.
 * Fixed CSV typos: "thje" → "the" (Level 2 example 2), "2 level up" → "2 levels up" (How to Play step 1), stray closing quotes in OSTs, and missing full stops at the end of the story lines and How to Play step 1. Everything else is word for word. **Voice and screen now agree where the sheet had them differ** (2026-10-12):
-  * the story's "Above 0" / "Below 0" lines say "than required" (the OST had "requirement");
+  * (Story V3, 2026-10-13: the "Above 0" / "Below 0" lines now follow the new sheet, VO = OST: "Above 0, means there is more water than requirement." / "Below 0, means there is less water.")
+  * ST4: the sheet's new VO "Look Pari, we'll use 0 as the reference point to mark the water levels." is also the bubble text (its OST is still the old line, "0 shows the water level we need.");
+  * Z2: the bubble shows Pari's line; the sheet's OST "Well Done!" is the celebration board over the scene (`board`);
   * the Level 2 tutorial's keypad step says "Enter the new water level." (the OST had "Tap");
   * Pari's Story End line is in number-line order, "below 0, at 0, and above 0" (the VO had "at 0, above 0, and below 0"; re-recorded in English and Hindi);
   * the last line says "Integers Expert" (the OST had "Water Level Expert").
 
   Level 2's on-screen text is still a deliberately shorter version of the spoken instruction ("Move the lever 3 levels down."), as in the sheet.
-* **Game script source (2026-10-06): "Integers_Rise and Fall - Game V3.csv"** for Level 1, the Level 2 game and the Level 3 game, word for word. The Level 2 teaching rows, TR2 and the Level 3 transition (S0, R2–R6) aren't in that sheet and keep their text from the earlier story-and-game sheet.
+* **Game script source (2026-10-06): "Integers_Rise and Fall - Game V3.csv"** (now Game V3 (2), unchanged) for Level 1, the Level 2 game and the Level 3 game, word for word. The story, How to Play, the Level 2 teaching rows (P1–P4), TR2 and the Level 3 transition (R2–R6) follow **Story V3** (2026-10-13). How to Play step 1 is a Narrator line in the sheet; Guddu says it (2026-10-08). The new voice lines were recorded with the same voices and notes (`tools/generate-audio.mjs`) and checked: all 321 clips at −16 LUFS ± 1.5, the new ones at the same pace as the old.
   * Cells the sheet shows as `#ERROR!` are text that started with "+", which the spreadsheet read as a formula. They follow the matching negative rows: "+2 on the scale glows", "+ and 2 buttons pulse", "+1 and +2 highlight one by one".
   * **Level 2 example 4:** the sheet's voice says "goes down 6 levels" and its lever-row equation says "(−2) - (6)", but the path, the answer (−5), the hints and the on-screen text all say 3 levels. It's kept at 3 levels down (2026-10-06), and the voice reads "The water level goes down 3 levels. Move the lever to the correct water level."
   * **Equation rule (2026-10-12): the second number is never negative.** There's no "+ (−3)": water going down is subtracting. So the sheet's "(−2) + (−3) = −5" is written **(−2) − 3 = −5**. It was the only equation that broke the rule.

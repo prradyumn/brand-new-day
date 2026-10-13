@@ -1046,6 +1046,32 @@
     eqShow(el.eqEq, el.eqAns);
     await FX.sleep(400);
   }
+  /** Level 2 teaching example (P2, P3): "If the water level is at +1" → (+1), "and rises" → +,
+      "by 2 levels" → the marker moves up level by level, each level glows and the number
+      counts 1, 2 with it, then "it reaches +3" → = +3 (and the display shows it). */
+  async function buildMoveEq(step) {
+    const b = step.build, vo = step.vo, n = el.eqB.textContent, dir = Math.sign(step.to - S.level);
+    await untilWord(vo, b.a);
+    eqShow(el.eqA); pulseLevel(S.level);
+    await untilWord(vo, b.op);
+    eqShow(el.eqOp);
+    await untilWord(vo, b.b);
+    for (let k = 1; S.level !== step.to; k++) {
+      setLevel(S.level + dir);
+      const lab = S.labels[S.level];
+      lab.classList.add("lit"); setTimeout(() => lab.classList.remove("lit"), 1500);
+      if (step.zeroGlow && S.level === 0) pulseLevel(0);
+      FX.sparkle(el.fx, LABEL_X, levelY(S.level), 6, 50);
+      el.eqB.textContent = String(k); fitEq();
+      el.eqB.classList.remove("eqhide"); FX.flash(el.eqB, "eqpop", 500);
+      await FX.sleep(480);
+    }
+    el.eqB.textContent = n; fitEq();
+    await untilWord(vo, b.ans);
+    eqShow(el.eqEq, el.eqAns);
+    FX.flash(el.eqPanel, "complete", 1000);
+    setPlate(fmt(S.level), true);
+  }
   /** Level 2/3 question: the start level is up with the question, then the sign
       on "rises" / "goes up" / "goes down", the number on "3 levels", then "= ?". */
   async function buildQuestionEq(q, vo) {
@@ -1574,7 +1600,7 @@
         FX.badge(el.fx, pp.x + 250, pp.y, true);
         FX.sfx("correct");
         await FX.sleep(1600);
-        await narrate(step.vo, { speaker: step.speaker, pose: step.pose, look: "padTank" });   // both stay lit with their tick
+        if (step.ostFirst) await narrate(step.vo, { speaker: step.speaker, pose: step.pose, look: "padTank" });   // a line after the tick (both stay lit)
         break;
       }
     }
@@ -1629,6 +1655,9 @@
         await animateTo(step.to, 480, !!step.zeroGlow);
         setPlate(fmt(S.level), true);
         if (step.ostAfter) showOst();                    // "The equation completes."
+        break;
+      case "countMove":                                  // "The marker … moves up two levels … Each level glows as the marker moves."
+        await buildMoveEq(step);
         break;
       case "countSteps":                                 // "… levels highlight one by one."
         if (step.build) await buildTeachEq(step);        // … and the equation is written along with the line
@@ -1688,6 +1717,13 @@
         break;
       }
       case "celebrate":                                  // "confetti/sparkles"
+        if (step.board) {                                // Z2: the sheet's OST "Well Done!" on the board, over the scene
+          el.marked.querySelector("span").textContent = step.board;
+          el.marked.classList.add("story");
+          FX.flash(el.marked, "show", 3000);
+          setTimeout(() => el.marked.classList.remove("story"), 3100);
+          FX.sfx("board");
+        }
         FX.sfx("confetti");
         FX.confetti(el.confetti, { count: 160, x: 960, y: 420, power: 1.15, spread: 1.3 });
         break;
@@ -2004,7 +2040,7 @@
     focusOn(null);
     const next = DATA.steps[DATA.steps.indexOf(step) + 1];
     if (step.button) [el.panel, el.plate, el.connector].forEach((n) => n.classList.add("away"));
-    await narrate(step.vo);
+    await narrate(step.vo, { speaker: step.speaker });
     setBanner(step.ost, "happy");
     if (step.appear === "eqPanel") {                       // "Equation panel appears beside the tank."
       setMode("lvl");
