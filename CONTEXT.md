@@ -341,7 +341,7 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
   * **Level 2 feedback:** the lever part says "Yes, the water level is at +5.", the keypad part "Correct! You marked the new water level." (sheet: "Correct! You reached …" / "Correct! The new water level is …").
   * **Removed:** P4's "Rises → Add / Goes Down → Subtract", S0, the Z2 "Well Done!" board, the equation in Level 3's OST, all equation read-outs.
   * **R3** now says "That's okay, Pari! Let's mark the water level using the number pad." (review comment; sheet: "That's okay! Pari. Let's mark the new water level …").
-  * **Rings:** below 0 in the hook a strong blue marker ring; in the Story End every ring is yellow (blue vanished in the water).
+  * **Rings:** every highlight ring is yellow, below 0 too, in the hook and the Story End (blue vanished in the water).
 
 * **How to Play example numbers.** The "Game start" row says the lever is above 0, so the demo starts at +2. Step 1 taps ▲ then ▼ ("up or down as necessary"). Its example, "Like water rises 2 levels up", is played in step 2: the lever is dragged +2 → +4. Then the demo picks + and types 4, and presses Check. **Sign first, then the number** (a teaching choice, 2026-10-08): the CSV has the number in step 3 and the sign in step 4, but the game swaps them. Step 1 is spoken by Guddu, not the Narrator as in the CSV, so a face is in the narrator box from the first line and one host presents all of How to Play. Change them in `data.js` (H1–H4).
 * The Level 1 tutorial marker starts at +2 ("starts above 0").

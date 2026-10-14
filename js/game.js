@@ -1941,14 +1941,12 @@
       for (const g of step.glow || []) {
         // a glow is [x, y] on the art, or a level on an empty-tank scene's drawn scale
         const [x, y] = typeof g === "number" ? [ST_TANK.labelX, stLevelY(g)] : g;
-        // below 0: a blue ring (the hook); in the Story End the water covers the marks below 0 and
-        // blue would vanish in it, so every ring there is yellow (2026-10-14 QA)
-        const neg = step.section !== "end" && (typeof g === "number" ? g < 0 : y > 600);
+        // every ring is yellow, below 0 too: a blue ring vanished in the water (2026-10-14 QA)
         if (tank && step.tank.to == null) await FX.sleep(setTankLevel(tank, g));   // the water reaches the mark, then it lights
         if (lever) { lever.style.top = y + "px"; await FX.sleep(300); }
         if (S.backReq) return;
         const d = document.createElement("div");
-        d.className = "spot" + (neg ? " neg" : ""); d.style.left = x + "px"; d.style.top = y + "px";   // below 0: blue, as in the art
+        d.className = "spot"; d.style.left = x + "px"; d.style.top = y + "px";
         spots.appendChild(d);
         void d.offsetWidth; d.classList.add("on");
         FX.sfx("tick");

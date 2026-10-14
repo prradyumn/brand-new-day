@@ -514,7 +514,7 @@ button { font-family: inherit; cursor: pointer; }
   opacity: 0; transform: scale(.7); transition: opacity .4s, transform .6s var(--ease-out);
 }
 #stage.host #charGlow { opacity: 1; transform: none; }
-#stage.host #banner { opacity: 0; transform: translateY(-16px); }   /* one Guddu at a time: his line is in the bubble */
+#stage.host #banner { opacity: 0; transform: translateY(-16px); transition: opacity .12s, transform .12s; }   /* one Guddu at a time: his line is in the bubble (gone before the bubble pops in) */
 @keyframes hostBreathe {       /* a gentle rise and fall: moving only, never resizing, so the art stays crisp */
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -6px; }
@@ -811,11 +811,6 @@ button { font-family: inherit; cursor: pointer; }
   background: radial-gradient(closest-side, rgba(255, 225, 80, 0) 0 58%, rgba(255, 214, 50, .85) 72%, rgba(255, 200, 0, 0) 100%);
   opacity: 0; transform: scale(.4);
   transition: opacity .35s, transform .45s var(--ease-spring);
-}
-/* below 0 (the hook): a strong blue marker ring, solid enough to read on the pale glass (2026-10-14 QA) */
-#story .spot.neg {
-  background: radial-gradient(closest-side, rgba(20, 110, 235, 0) 0 54%, rgba(10, 95, 225, .95) 66%, rgba(30, 120, 240, .75) 78%, rgba(40, 140, 255, 0) 100%);
-  filter: drop-shadow(0 0 6px rgba(20, 110, 235, .55));
 }
 #story .spot.on { opacity: 1; transform: scale(1); animation: spotPulse 1.6s ease-in-out .45s infinite; }
 @keyframes spotPulse { 50% { transform: scale(1.18); opacity: .8; } }
