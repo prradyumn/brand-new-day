@@ -751,7 +751,6 @@ button { font-family: inherit; cursor: pointer; }
   animation: badgePop 1.3s var(--ease-spring) forwards;
 }
 .cross-badge { background: radial-gradient(circle at 35% 30%, #ffb3a8, #ef4a3c 60%, #b7231a); box-shadow: 0 10px 30px rgba(0,0,0,.35); animation-duration: .9s; }
-#stage #markedBadge.story { left: 610px; top: 46px; z-index: 75; }   /* Story End Z2 "Well Done!": over the scene, top centre */
 #markedBadge {             /* sits over the number display, centred on it */
   left: 173.5px; top: 259.5px; width: 700px; height: 178px;
   background: url(../assets/board-green.png) center / 100% 100% no-repeat;
@@ -813,7 +812,11 @@ button { font-family: inherit; cursor: pointer; }
   opacity: 0; transform: scale(.4);
   transition: opacity .35s, transform .45s var(--ease-spring);
 }
-#story .spot.neg { background: radial-gradient(closest-side, rgba(90, 180, 255, 0) 0 58%, rgba(60, 160, 255, .85) 72%, rgba(40, 140, 255, 0) 100%); }
+/* below 0 (the hook): a strong blue marker ring, solid enough to read on the pale glass (2026-10-14 QA) */
+#story .spot.neg {
+  background: radial-gradient(closest-side, rgba(20, 110, 235, 0) 0 54%, rgba(10, 95, 225, .95) 66%, rgba(30, 120, 240, .75) 78%, rgba(40, 140, 255, 0) 100%);
+  filter: drop-shadow(0 0 6px rgba(20, 110, 235, .55));
+}
 #story .spot.on { opacity: 1; transform: scale(1); animation: spotPulse 1.6s ease-in-out .45s infinite; }
 @keyframes spotPulse { 50% { transform: scale(1.18); opacity: .8; } }
 #story .sign {
@@ -908,13 +911,15 @@ button { font-family: inherit; cursor: pointer; }
 }
 #btnMute { left: 1824px; top: 22px; }
 /* Look back (game.js): a speech bubble with a back arrow; dim until something has been said */
-#btnBack, #btnStoryBack { left: 1500px; top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
-#btnPause { left: 1406px; top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
+#btnPause, #btnStoryBack, #btnBack { top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
+#btnPause { left: 1312px; } #btnStoryBack { left: 1406px; } #btnBack { left: 1500px; }
 #btnBack svg, #btnStoryBack svg, #btnPause svg { width: 48px; height: 48px; display: block; }
-/* ⏸ and back only while the game runs (not on the cover or the end screen); the story has ⏮
-   (back a scene), the game 💬 (look back at the lines) in the same place */
-#stage:not(.playing) :is(#btnPause, #btnBack, #btnStoryBack),
-#stage.in-story #btnBack, #stage:not(.in-story) #btnStoryBack { display: none; }
+#btnPause .ico-play, #btnPause.on .ico-pause { display: none; }   /* ⏸ ⇄ ▶ */
+#btnPause.on .ico-play { display: block; }
+#btnPause.on { background: #fff8e1; border-color: #ffd34d; }
+#btnStoryBack.nudge { animation: pulseSoft .35s ease-in-out 2; }
+/* ⏸, ⏮ and 💬 only while the game runs (not on the cover or the end screen) */
+#stage:not(.playing) :is(#btnPause, #btnBack, #btnStoryBack) { display: none; }
 #btnBack.off { opacity: .4; pointer-events: none; }
 #review {
   inset: 0; width: 1920px; height: 1080px; z-index: 97;

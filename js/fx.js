@@ -148,7 +148,9 @@
 
   /** End the line that is playing now, as if it had finished (game.js: Check pressed during
       the keypad instruction). Whoever waits on it carries on at once. */
-  let endActive = null;
+  let endActive = null, lastEndAt = 0;
+  FX.busy = () => !!endActive;                    // a line is playing
+  FX.lastEnd = () => lastEndAt;                   // when the last one ended (game.js leaves a breath between lines)
   FX.endLine = () => {
     if (!endActive) return;
     try { synth && synth.cancel(); } catch (e) {}
@@ -184,6 +186,7 @@
         leaveHooks.delete(onLeave);
         muteHooks.delete(onMute);
         if (endActive === endMe) endActive = null;
+        lastEndAt = performance.now();
         resolve(!!cut);
       };
       const onLeave = () => finish(true);

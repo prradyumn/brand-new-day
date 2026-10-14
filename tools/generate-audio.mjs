@@ -78,7 +78,6 @@ function loadLines() {
   for (const s of data.steps) {
     const who = s.speaker || "guddu";
     add(who, s.vo);                                   // demo / say / gate
-    add("guddu", s.eqVo);                             // the question's equation, read aloud
     if (s.idle) add("guddu", s.idle.text);            // gate inactivity
     for (const p of [s.lever, s.entry]) {
       if (!p) continue;

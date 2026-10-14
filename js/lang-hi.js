@@ -102,7 +102,6 @@
         "अब, अगर पानी का स्तर +3 पर है और 5 स्तर नीचे जाता है, तो यह −2 पर पहुँच जाता है।",
       "Oh! Got it! When the level rises, we add. When it goes down, we subtract.":
         "अरे! समझ गई! जब स्तर बढ़ता है, हम जोड़ते हैं। जब घटता है, हम घटाते हैं।",
-      "Rises → Add\nGoes Down → Subtract": "बढ़े → जोड़ो\nघटे → घटाओ",
       "Let’s calculate the water levels exactly!": "चलो, पानी के स्तरों का सही हिसाब लगाते हैं!",
       "Calculate the Water Level!": "पानी का स्तर निकालो!",
       "Let’s find the new water level.": "चलो, पानी का नया स्तर ढूँढते हैं।",
@@ -124,11 +123,9 @@
       "Level Complete!": "लेवल पूरा हुआ!",
 
       /* ---- Level 3 transition ---- */
-      "Let’s mark some more water levels.": "चलो, पानी के कुछ और स्तरों पर निशान लगाते हैं।",
-      "Let’s mark some more water levels!": "चलो, पानी के कुछ और स्तरों पर निशान लगाते हैं!",
       "Oh! The lever isn’t working now!": "अरे! लीवर अब काम नहीं कर रहा!",
-      "That’s okay! Pari. \nLet’s mark the new water level using the number pad.":
-        "कोई बात नहीं, परी! \nचलो, नंबर पैड से पानी के नए स्तर पर निशान लगाते हैं।",
+      "That’s okay, Pari! Let’s mark the water level using the number pad.":
+        "कोई बात नहीं, परी! चलो, नंबर पैड से पानी के स्तर पर निशान लगाते हैं।",
       "Choose the correct sign and number.": "सही चिह्न और संख्या चुनो।",
       "And Let’s see where the water level reaches!": "और देखते हैं, पानी का स्तर कहाँ तक पहुँचता है!",
       "I’m ready! Let’s mark the new level.": "मैं तैयार हूँ! चलो, नए स्तर पर निशान लगाते हैं।",
@@ -145,8 +142,7 @@
       "So integers helped us show water levels below 0, at 0, and above 0!":
         "तो पूर्णांकों ने हमें 0 से नीचे, 0 पर और 0 से ऊपर के पानी के स्तर दिखाने में मदद की!",
       "Excellent! You’re an Integers Expert now!": "शानदार! अब तुम पूर्णांकों के विशेषज्ञ हो!",
-      "Excellent! You’re a Water Level Expert now!": "शानदार! अब तुम पानी के स्तर के विशेषज्ञ हो!",
-      "Well Done!": "शाबाश!"
+      "Excellent! You’re a Water Level Expert now!": "शानदार! अब तुम पानी के स्तर के विशेषज्ञ हो!"
     },
 
     /* [English pattern, (match, translate) → Hindi] — the repeated lines that differ only by numbers */
@@ -168,6 +164,7 @@
       [/^Enter ([+−]?\d+)\.$/, (m) => `${m[1]} डालो।`],
       // Level 2
       [/^Correct! You reached ([+−]?\d+)\.$/, (m) => `सही! लीवर ${m[1]} पर पहुँच गया।`],
+      [/^Yes, the water level is at ([+−]?\d+)\.$/, (m) => `हाँ, पानी का स्तर ${m[1]} पर है।`],
       [/^Correct! The new water level is ([+−]?\d+)\.$/, (m) => `सही! पानी का नया स्तर ${m[1]} है।`],
       [/^Enter ([+−]?\d+) on the screen\.$/, (m) => `स्क्रीन पर ${m[1]} डालो।`],
       [/^Move the lever (\d+) levels (up|down) from ([+−]?\d+)\.$/,
@@ -184,10 +181,6 @@
         (m) => `पानी ${m[2]} स्तर ${dirWord(m[1])} जाता है। ${m[3]} से ${m[2]} स्तर ${dirWord(m[1])} गिनो।`],
       [/^The new water level is ([+−]?\d+)\. Enter \1\.$/, (m) => `पानी का नया स्तर ${m[1]} है। ${m[1]} डालो।`]
     ],
-
-    /* the equation Guddu reads aloud (data.js eqVo): the symbols stay, "?" is asked in Hindi
-       ("0 + 3 = कितना?" → "शून्य धन 3 बराबर कितना?") */
-    eqVo: (eq) => eq.replace(/\?$/, "कितना?"),
 
     /* what the voice reads (the screen keeps the symbols): +2 "धन 2", −3 "ऋण 3", 0 "शून्य";
        in an equation + is "धन", − "ऋण" and = "बराबर", as Hindi-medium classes read them */
