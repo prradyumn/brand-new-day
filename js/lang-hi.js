@@ -26,13 +26,14 @@
       title: "पूर्णांक<br /><span>उतार और चढ़ाव</span>",
       check: "जाँचो",
       start: "शुरू करो",
-      langBtn: "English"                     // the button offers the other language
+      langName: "हिंदी"                      // the button shows the language in use
     },
 
     /* data.js `ui` */
     ui: {
       marked: "निशान लग गया!",
-      howTo: "कैसे खेलें"
+      howTo: "कैसे खेलें",
+      level1: "लेवल 1", level2: "लेवल 2", level3: "लेवल 3"
     },
 
     /* the voice's cue words for building the equation (game.js buildQuestionEq):

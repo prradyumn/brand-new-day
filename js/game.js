@@ -81,12 +81,12 @@
     eqPanel: $("eqPanel"), eqA: $("eqA"), eqOp: $("eqOp"), eqB: $("eqB"), eqEq: $("eqEq"), eqAns: $("eqAns"),
     btnCheck: $("btnCheck"), btnClear: $("btnClear"),
     water: $("water"), streamIn: $("streamIn"), splashIn: $("splashIn"), streamOut: $("streamOut"),
-    strip: $("scaleStrip"), countLine: $("countLine"),
+    strip: $("scaleStrip"), countLine: $("countLine"), voiceWait: $("voiceWait"),
     marker: $("marker"), btnUp: $("btnUp"), btnDown: $("btnDown"),
     fx: $("fxLayer"), confetti: $("confetti"), marked: $("markedBadge"), medal: $("medal"),
     gateBtn: $("gateBtn"), progress: $("progress"), paused: $("paused"),
     btnMute: $("btnMute"), startScreen: $("startScreen"), endScreen: $("endScreen"), hand: $("hand"),
-    under: $("under"), flood: $("flood"),
+    flood: $("flood"),
     story: $("story"), shots: [...document.querySelectorAll("#story .shot")], caption: $("caption"),
     bubble: $("bubble"), hostBubble: $("hostBubble"),
     btnBack: $("btnBack"), btnStoryBack: $("btnStoryBack"), btnPause: $("btnPause"), btnResume: $("btnResume"),
@@ -122,7 +122,8 @@
     wrong: 0,            // wrong attempts in the current part
     gate: null,          // current transition step
     guided: false,       // spotlight/blur + character
-    eqLive: false,       // equation follows the marker (Level 2 tutorial)
+    eqLive: false,       // the equation follows the marker (all of Level 2)
+    restartReq: false,   // the language changed: the current step plays again (not the one before)
     labels: {}, ticks: {}, tticks: {},
     timers: { settle: null, idle: null, edge: null, pipeIn: null, pipeOut: null },
     resolveMarker: null, resolveEntry: null, resolveGate: null
@@ -131,7 +132,7 @@
   window.__GAME_STATE = S; // exposed for debugging / automated tests
   // the web fonts change text widths once they arrive: fit the equation and the narrator box again
   if (document.fonts) {
-    const refit = () => { fitEq(); fitText(el.bannerText, el.bannerText.textContent.length > 70 ? 28 : 32); };
+    const refit = () => { fitEq(); fitText(el.bannerText, 30); };
     document.fonts.ready.then(refit);
     document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", refit);
   }
@@ -279,6 +280,7 @@
     } else {
       el.countLine.classList.remove("on");
     }
+
   }
 
   let waterMoveTimer = null;
@@ -554,15 +556,14 @@
   }
   function setBanner(text, mood) {
     text = lastChunk(text);
+    const same = el.bannerText.textContent === text;
     el.bannerText.textContent = text;
-    el.bannerText.classList.toggle("long", text.length > 70);
-    fitText(el.bannerText, text.length > 70 ? 28 : 32);     // long lines (and Hindi) never spill out of the box
+    if (!same) fitText(el.bannerText, 30);                 // one size for every line; smaller only if it would spill (2026-10-19 QA: text jumped)
     setAvatar(mood);
     if (el.stage.classList.contains("host")) {              // Guddu is on screen: his line is in his bubble, never also in the box
       placeBubble({ shape: "wide", tail: "left", w: 560, tip: (el.charArt.sprite || POSES.talk).tip }, text, el.hostBubble);
       return;
     }
-    FX.flash(el.banner, "speak", 400);
   }
   const piece = (cs, i, fin) => (i === cs.length - 1 && fin && alike(cs[i], fin) ? fin : cs[i]);
   /** The piece a line opens with (the screen text already, if it is a one-piece line that says the same). */
@@ -967,8 +968,8 @@
   }
 
   /* Equation panel (Level 2/3): "a op b = ?" in the CSV's notation.
-     { moved } shows the live form while the lever moves ("0 + 1"),
      { answer } completes it ("0 + 3 = +3"). */
+  /* { moved } shows the live form while the lever moves ("0 + 1"), { answer } completes it. */
   function renderEq(q, { moved = null, answer = null } = {}) {
     const e = q.eq, live = moved !== null && moved !== 0;
     eqParts().forEach((n) => n.classList.remove("eqhide"));
@@ -1137,6 +1138,11 @@
     setPlate(S.entry === "" ? "?" : S.entry.replace("-", "−"));
   }
 
+  /** The keypad takes keys or not; locked keys don't press down (2026-10-19 QA, Bug 7). */
+  function setPadLive(on) {
+    S.padLive = !!on;
+    el.panel.classList.toggle("locked", !on);
+  }
   function pressKey(k) {
     if (!S.padLive || holding()) return;
     resetIdle();
@@ -1216,14 +1222,14 @@
     if (q.autoLever) { previewGen++; await animateTo(q.start, 150); }   // Level 3: the water slides back to the start
     if (!p.wrong) { resetIdle(); return; }
     S.phase = "feedback";
-    S.padLive = false;                                       // the hint first
+    setPadLive(false);                                       // the hint first
     stopIdle();
     const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
     await sayFocused(fb.text, "sad", fxArea(fb.fx));
     await runFx(fb.fx, q, fb);
     setBanner(p.ost, "happy");
     S.phase = "entry";
-    S.padLive = true;
+    setPadLive(true);
     resetIdle();
   }
 
@@ -1308,7 +1314,7 @@
   /* =================================================================
      Transitions
        · question → question (same level): card flip of the display + equation
-       · level → level: dive into the tank (see diveWipe)
+       · level → level: the flood card with the level name (see levelWipe)
      ================================================================= */
   const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const FLIP = (deg) => ({ transform: `perspective(900px) rotateX(${deg}deg)` });
@@ -1344,73 +1350,14 @@
   }
   const firstLine = (s) => s.vo || (s.lever && s.lever.vo) || (s.entry && s.entry.vo) || "";
 
-  /* Level change: "dive into the tank". The camera (the whole #stage) zooms into
-     the water, the screen goes underwater (#under: bubbles + light rays, outside
-     the stage so it doesn't zoom), the next level is set up out of sight, and the
-     camera rises back out of the new tank's water with a small bounce. */
-  const TANK_X = 1407;                                              // centre of the glass
-  const camAt = (base, y, k) => `${base} translate(${TANK_X}px, ${y}px) scale(${k}) translate(${-TANK_X}px, ${-y}px)`;
-  function riseBubbles(n) {
-    const box = el.under.querySelector(".bubbles");
-    for (let i = 0; i < n; i++) {
-      const b = document.createElement("span");
-      const sz = 1 + Math.random() * 3.6;
-      Object.assign(b.style, { width: sz + "vmin", height: sz + "vmin", left: Math.random() * 100 + "%" });
-      box.appendChild(b);
-      b.animate([{ transform: "translate(0, 0)", opacity: 0 }, { opacity: 1, offset: 0.1 },
-                 { transform: `translate(${(Math.random() - 0.5) * 8}vmin, -125vh)`, opacity: 0.9 }],
-        { duration: 1300 + Math.random() * 900, delay: Math.random() * 600, easing: "ease-in", fill: "forwards" })
-        .finished.then(() => b.remove());
-    }
-  }
-
-  async function diveWipe(during) {
-    const under = el.under;
-    if (REDUCED) {                                                  // reduce-motion: a short fade
-      under.classList.remove("hidden");
-      await under.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: "forwards" }).finished;
-      await during();
-      await under.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: "forwards" }).finished;
-      under.classList.add("hidden"); under.getAnimations().forEach((a) => a.cancel());
-      return;
-    }
-    const base = el.stage.style.transform;
-    const inY = Math.min(955, levelY(S.water !== null ? S.water : S.level) + 50);   // just under the water line
-    el.stage.style.willChange = "transform";
-    FX.sfx("splashIn");
-    const dive = el.stage.animate([{ transform: camAt(base, inY, 1) }, { transform: camAt(base, inY, 6) }],
-      { duration: 900, easing: "cubic-bezier(.6,0,.9,.5)", fill: "forwards" });
-    await FX.sleep(420);
-    under.classList.remove("hidden");
-    under.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, fill: "forwards" });
-    riseBubbles(30);
-    FX.sfx("bubbles");
-    await dive.finished;
-
-    await during();                                                 // next level set up while underwater
-
-    const outY = Math.min(900, levelY(S.level) + 130);              // rise out of the new tank's water
-    const rise = el.stage.animate([{ transform: camAt(base, outY, 6) }, { transform: camAt(base, outY, 0.97), offset: 0.85 }, { transform: camAt(base, outY, 1) }],
-      { duration: 1000, delay: 600, easing: "cubic-bezier(.1,.6,.3,1)", fill: "both" });
-    dive.cancel();
-    await FX.sleep(600);
-    FX.sfx("splashOut");
-    riseBubbles(12);
-    under.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 520, delay: 250, fill: "forwards" });
-    await rise.finished;
-    rise.cancel();
-    el.stage.style.willChange = "";
-    under.classList.add("hidden");
-    under.getAnimations().forEach((a) => a.cancel());
-    under.querySelector(".bubbles").innerHTML = "";
-  }
-
-  /** Level change: the dive, with the board reset for the step that opens the next level. */
+  /** Level change: the screen floods, the level's name ("Level 2", CSV section) stays up ~2 s
+      while the next level is set up underneath, and the water drains (2026-10-19 QA: the
+      zoom-in dive was abrupt and the screens around it went by too fast). */
   function levelWipe(step) {
     const i = DATA.steps.indexOf(step);
     S.guided = false;
-    focusOn(null);                                                  // no blur layer while the camera moves
-    return diveWipe(async () => {
+    focusOn(null);                                                  // no blur layer during the change
+    return floodWipe(DATA.ui[step.section === "end" ? "level3" : step.section] || null, { during: async () => {
       focusOn(null);
       handHide();
       el.character.classList.remove("in", "talk");
@@ -1425,8 +1372,8 @@
       if (step.section === "level2" || step.section === "level3") setMode("lvl");
       if (step.section === "level3") el.eqPanel.classList.add("hidden");   // the Level 3 challenge appears at R5
       setSpeaker(step.speaker);
-      setBanner(firstChunk(firstLine(step)), "happy");              // the next line is already up when the camera rises
-    });
+      setBanner(firstChunk(firstLine(step)), "happy");              // the next line is already up when the water drains
+    } });
   }
 
   /* =================================================================
@@ -1447,7 +1394,7 @@
       FX.confetti(el.confetti, { count: 90, x: 820, y: 330 });
     }
     await sayFocused(p.correct, "happy", S.area);     // "Correct! You reached 0." with the scale (or display) still lit
-    await FX.sleep(S.checkQueued ? 0 : 500);
+    await FX.sleep(S.checkQueued ? 0 : 300);
   }
 
   /* =================================================================
@@ -1522,9 +1469,11 @@
     FX.flash(S.labels[q.target], "pulse", 2800);
     if (q.target === 0) { FX.flash(S.ticks[0], "pulse", 2800); FX.flash(S.tticks[0], "pulse", 2800); }   // "The 0 mark glows briefly."
     // The keypad works from the lock on (2026-10-12 review: Level 1 waited ~6 s for the next
-    // instruction): what is typed during "Correct!" stays, and Check ends the line early.
+    // instruction): what is typed during "Correct!" stays; Check waits for the line to end.
     // Not in the guided tutorial, where the keypad is behind the glass until its own step.
-    if (q.entry && !S.guided) { S.entry = ""; entryDisplay(); S.padLive = true; }
+    // (QA 2026-10-19 Bug 12 asked for the keypad only after the instruction: not applied, it
+    // goes against this review.)
+    if (q.entry && !S.guided) { S.entry = ""; entryDisplay(); setPadLive(true); }
     await succeed(q, p, "level");
   }
 
@@ -1534,7 +1483,7 @@
     showPlate();
     showPanel();
     if (!S.padLive) { S.entry = ""; entryDisplay(); }
-    S.padLive = true;                                     // keys work while the instruction plays; Check ends it
+    setPadLive(true);                                     // keys work while the instruction plays; Check waits for it to end
     const answered = new Promise((r) => (S.resolveEntry = r));
     if (S.entry === "" && !S.checkQueued)                 // (already typing since "Correct!": no need to be told)
       await Promise.all([narrate(p.vo, { pose: p.pose, look: "pad", ost: p.ost }), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
@@ -1549,7 +1498,7 @@
     if (S.checkQueued) { S.checkQueued = false; checkEntry(); }
     await answered;
     S.resolveEntry = null;
-    S.padLive = false;
+    setPadLive(false);
     previewGen++;                                         // the answer is in: no more preview steps
     stopIdle();
     S.phase = "feedback";
@@ -1891,7 +1840,9 @@
     if (S.sceneSwap || !cur.classList.contains("on") || !cur.querySelector("img").src.endsWith(src)) {
       S.sceneSwap = false;
       shot = el.shots[shotIdx = 1 - shotIdx];
-      shot.querySelector("img").src = src;
+      const img = shot.querySelector("img");
+      img.src = src;
+      try { await img.decode(); } catch (e) {}                   // decoded first, so the cross-fade doesn't stutter
       shot.getAnimations().forEach((a) => a.cancel());
       shot.style.transform = "";
       shot.classList.add("on");
@@ -2010,7 +1961,7 @@
         if (undo) S.floodBack = () => { go.onclick = null; S.floodBack = null; r("back"); };   // ⏮ (story)
       });
       if (choice === "back") undo();                                     // what was there comes back under the water
-    } else await FX.sleep(title ? 1900 : 450);
+    } else await FX.sleep(title ? 2000 : 450);
     if (title) { card.classList.replace("on", "away"); await FX.sleep(350); }   // the card floats off
     FX.sfxLoop("drain", 1200);
     FX.sfx("splashOut");
@@ -2122,7 +2073,7 @@
   // "Learner observes and taps to continue." — a tap anywhere on the game, including
   // the keypad (capture phase, before the keys stop the event); HUD/QA controls excluded
   el.stage.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("#btnMute, #btnJump, #btnBack, #btnStoryBack, #btnPause, #review, #jumper, #paused")) return;
+    if (e.target.closest("#btnMute, #btnJump, #btnBack, #btnStoryBack, #btnPause, #btnLang, #review, #jumper, #paused")) return;
     if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   }, true);
 
@@ -2250,6 +2201,29 @@
     if ((S.phase === "marker" || S.phase === "entry") && S.part) { FX.sfx("button"); replayInstruction(); return; }
     FX.flash(el.btnStoryBack, "nudge", 700);       // nothing to go back to this moment (a line about an answer is playing)
   }
+  /* The language changed (js/lang.js, no reload; 2026-10-19 QA): every line in GAME_DATA is
+     already swapped, so the step that is playing starts again in the new language. In a
+     question the instruction is spoken again; a line about an answer finishes, and the next
+     one is in the new language. */
+  window.addEventListener("langchange", () => {
+    FX.lang = CFG.speechLang;
+    fitEq();
+    if (!el.stage.classList.contains("playing")) {         // still on the cover: the first line, in the new language
+      const first = DATA.steps[START_INDEX];
+      setSpeaker(first.speaker);
+      setBanner(first.ost || (first.lever || first.entry).ost, "happy");
+      return;
+    }
+    if (S.backable && !S.backReq) {
+      S.restartReq = true; S.backReq = true;
+      FX.endLine();
+      if (S.resolveGate) S.resolveGate("back");
+    } else if ((S.phase === "marker" || S.phase === "entry") && S.part) {
+      setBanner(S.part.ost, "happy");
+      replayInstruction();
+    }
+  });
+
   /** ⏮ during a question: its instruction is spoken again (the learner missed it). */
   async function replayInstruction() {
     const q = S.q, p = S.part, phase = S.phase;
@@ -2410,6 +2384,7 @@
       prev = step;
       S.stepId = step.id;                                 // the language button reloads at this step
       S.section = step.section;                           // config.voicePace
+      prefetchVoice(i);
       el.stage.classList.toggle("in-story", step.type === "scene");
       if (backable(step)) { snaps[i] = snapshot(); S.backReq = false; S.backable = true; }
       let r = null;
@@ -2420,7 +2395,9 @@
       else if (step.type === "scene") r = await runScene(step);
       S.backable = false;
       if (r === "back") {
-        const t = snaps[stepBefore(i)] ? stepBefore(i) : i;   // (a QA jump: the step before never ran, so this one starts again)
+        // (a language change, or a QA jump where the step before never ran: this one starts again)
+        const t = !S.restartReq && snaps[stepBefore(i)] ? stepBefore(i) : i;
+        S.restartReq = false;
         if (step.type !== "scene") restore(snaps[t]);
         S.backReq = false;
         i = t - 1;
@@ -2433,6 +2410,20 @@
     el.confetti.style.zIndex = 96;                       // confetti over the end screen
     FX.confetti(el.confetti, { count: 260, x: 960, y: 420, power: 1.3, spread: 1.4 });
     FX.sfx("complete");
+  }
+
+  /** Fetch the clips of this step and the next two before they are needed (slow networks). */
+  function prefetchVoice(i) {
+    for (const st of DATA.steps.slice(i, i + 3)) {
+      const who = st.speaker || "guddu", lines = [[who, st.vo]];
+      if (st.idle) lines.push(["guddu", st.idle.text]);
+      for (const p of [st.lever, st.entry]) if (p) {
+        lines.push(["guddu", p.vo], ["guddu", p.correct]);
+        (p.wrong || []).forEach((w) => lines.push(["guddu", w.text]));
+        if (p.idle) lines.push(["guddu", p.idle.text]);
+      }
+      lines.forEach(([sp, t]) => t && FX.prefetch(t, sp));
+    }
   }
 
   function init() {
@@ -2457,6 +2448,9 @@
     prepareJump();
     setMarkerEnabled(false);
 
+    $("btnStart").classList.remove("loading");
+    $("btnStart").disabled = false;
+    prefetchVoice(START_INDEX);
     $("btnStart").addEventListener("click", () => {
       FX.unlockSpeech(); // Safari/iOS: speech and audio must be started from this tap
       FX.unlockSfx();
@@ -2476,6 +2470,7 @@
     window.addEventListener("fx:resumed", () => el.paused.classList.add("hidden"));
     // Voice couldn't start: flag the sound button (no added text; the reason is in the console)
     window.addEventListener("fx:voiceproblem", () => el.btnMute.classList.add("warn"));
+    window.addEventListener("fx:buffering", (e) => el.voiceWait.classList.toggle("on", !!e.detail));   // slow network: the line is on its way
     if (CFG.qaJumper) initJumper();
     el.btnMute.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
@@ -2493,7 +2488,10 @@
     .concat(DATA.steps.filter((s) => s.tank).map((s) => `assets/story/chars-${s.scene}.png`))
     .concat([...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src))
     .concat(["assets/cover.jpg"]);
-  Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; })))
+  // the Start button shows how much has loaded (a ring), and works once everything has
+  let loaded = 0;
+  const loadedOne = () => { loaded++; $("btnStart").style.setProperty("--load", Math.round((loaded / PRELOAD.length) * 100) + "%"); };
+  Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => { loadedOne(); r(); }; i.src = src; })))
     .then(init);
   fitStage();
 })();

@@ -211,6 +211,10 @@ function voiceMp3(wav, out) {
 /* ---------------------------------------------------------------------
    Voice-over
    --------------------------------------------------------------------- */
+/** "assets/vo/x.mp3?v=1a2b3c4d": the clip's content in its address, so browsers can keep it
+    for a year (vercel.json) and still get a re-recorded take at once. */
+const versioned = (file) => `${file}?v=${crypto.createHash("sha1").update(fs.readFileSync(path.join(ROOT, file))).digest("hex").slice(0, 8)}`;
+
 async function makeVoice() {
   const lines = loadLines();
   const dir = path.join(ROOT, "assets/vo");
@@ -225,7 +229,7 @@ async function makeVoice() {
     if (fs.existsSync(out) && !ARGS.has("--force")) {
       // --verify: listen to the existing clip again and re-record it if it doesn't match the script
       if (!ARGS.has("--verify") || matches(spoken, await transcribe(fs.readFileSync(out), "audio/mpeg", l.lang), l.lang).ok) {
-        manifest[key] = file; done++;
+        manifest[key] = versioned(file); done++;
         process.stdout.write(`\r  voice-over ${done}/${lines.length}   `);
         return;
       }
@@ -240,13 +244,13 @@ async function makeVoice() {
         const m = matches(spoken, heard, l.lang);
         if (!m.ok) { last = heard; continue; }                          // ad-libbed or cut: record again
         voiceMp3(wav, out);
-        manifest[key] = file; made++;
+        manifest[key] = versioned(file); made++;
         break;
       } catch (e) { last = e.message; await sleep(1500); }
     }
     if (!manifest[key]) {
       failed.push({ ...l, heard: last, kept: fs.existsSync(out) });
-      if (fs.existsSync(out)) manifest[key] = file;                    // keep the earlier clip rather than lose it
+      if (fs.existsSync(out)) manifest[key] = versioned(file);         // keep the earlier clip rather than lose it
     }
     done++;
     process.stdout.write(`\r  voice-over ${done}/${lines.length}   `);
@@ -257,7 +261,7 @@ async function makeVoice() {
   process.stdout.write("\n");
 
   // remove clips no longer in the script
-  const keep = new Set(Object.values(manifest).map((f) => path.basename(f)));
+  const keep = new Set(Object.values(manifest).map((f) => path.basename(f.split("?")[0])));
   for (const f of fs.readdirSync(dir)) if (f.endsWith(".mp3") && !keep.has(f)) fs.unlinkSync(path.join(dir, f));
 
   const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));

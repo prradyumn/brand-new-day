@@ -26,7 +26,7 @@ vm.runInNewContext(fs.readFileSync(path.join(ROOT, "assets/vo/manifest.js"), "ut
 const clips = [...new Set(Object.values(sandbox.window.VO_MANIFEST))];
 
 function envelope(file) {
-  const r = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", path.join(ROOT, file), "-af",
+  const r = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", path.join(ROOT, file.split("?")[0]), "-af",   // (the manifest's ?v= version tag is not part of the file name)
     `aresample=${RATE},asetnsamples=n=${RATE * STEP_S}:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level`,
     "-f", "null", "-"], { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`ffmpeg failed on ${file}`);

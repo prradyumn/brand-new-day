@@ -26,7 +26,8 @@ window.GAME_DATA = {
   /* Text the engine shows that comes from the CSV ---------------------- */
   ui: {
     marked: "Water Level Marked!",         // CSV "Success / Confetti" column
-    howTo: "How to Play"                   // CSV section name, on the story → game chapter-break card
+    howTo: "How to Play",                  // CSV section name, on the story → game chapter-break card
+    level1: "Level 1", level2: "Level 2", level3: "Level 3"   // CSV section names, on the card between levels
   },
 
   /* The flow. Step types:
@@ -46,7 +47,8 @@ window.GAME_DATA = {
        eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3). Rule: b is never
                         negative (no "+ (−3)"): the water going down is written as "− 3"
        liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3 (all of Level 2; going
-                        down it reads (+2) − 1, never "+ (−1)")
+                        down it reads (+2) − 1, never "+ (−1)"). QA 2026-10-19 Bug 11 asked for the
+                        question to stay fixed: not applied, it goes against the 2026-10-12 review.
        autoLever        Level 3: the lever is off; it moves by itself after a correct answer
                         (Level 2/3 equations build with the question's VO: the sign on
                         "rises"/"goes up"/"goes down", the number on "3 levels", then "= ?")

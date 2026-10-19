@@ -22,7 +22,7 @@
 
       <!-- ============ NUMBER PLATE + KEYPAD (left) ============ -->
       <div id="connector" class="hidden"></div>
-      <div id="panel" class="hidden">
+      <div id="panel" class="hidden locked">   <!-- locked: not taking keys yet (game.js setPadLive) -->
         <div id="keys">
           <button class="key" data-k="1">1</button>
           <button class="key" data-k="2">2</button>
@@ -170,8 +170,13 @@
       <button id="btnBack" class="hud-btn off" aria-label="Look back at what was said">
         <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10h32a5 5 0 0 1 5 5v16a5 5 0 0 1-5 5H22l-9 7v-7H8a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5z" fill="#fff" stroke="#0d3b8c" stroke-width="3" stroke-linejoin="round"/><path d="M27 16l-8 7 8 7" fill="none" stroke="#0d3b8c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <button id="btnLang" class="hud-btn" data-i18n="langBtn">हिंदी</button>   <!-- language: reloads at the same step (js/lang.js) -->
+      <!-- language: shows the language in use; a tap switches in place (js/lang.js) -->
+      <button id="btnLang" class="hud-btn" aria-label="Language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#0d3b8c" stroke-width="2"/><path d="M3 12h18M12 3c2.6 2.6 3.6 5.6 3.6 9S14.6 18.4 12 21M12 3C9.4 5.6 8.4 8.6 8.4 12s1 6.4 3.6 9" fill="none" stroke="#0d3b8c" stroke-width="2"/></svg>
+        <b data-i18n="langName">English</b>
+      </button>
       <button id="btnMute" class="hud-btn" aria-label="Mute sound">🔊</button>
+      <div id="voiceWait" aria-hidden="true"></div>   <!-- a ring around 🔊 while a voice line is still loading (slow network) -->
       <button id="btnJump" class="hud-btn hidden" aria-label="QA level jumper">⏭</button>
       <div id="progress"></div>
       <!-- QA level jumper (config.qaJumper) -->
@@ -221,7 +226,7 @@
         <div class="cover-title">
           <h1 data-i18n="title">Integers<br /><span>Rise and Fall</span></h1>
           <div id="qaStartTag" class="hidden"></div>
-          <button id="btnStart" class="cover-btn" aria-label="Start"><i class="play" aria-hidden="true"></i><b data-i18n="start">Start</b></button>
+          <button id="btnStart" class="cover-btn loading" aria-label="Start" disabled><i class="play" aria-hidden="true"></i><b data-i18n="start">Start</b><span class="load-ring" aria-hidden="true"></span></button>
         </div>
       </div>
       <!-- End: the cover art again, with the completion badge and a replay button -->
@@ -238,11 +243,20 @@
     </div>
   </div>
 
+  <!-- Size the stage at once, before the game scripts load: until then it would show at its full
+       1920 × 1080 (a zoomed-in flash). game.js keeps it fitted from here on (fitStage). -->
+  <script>
+    (function () {
+      var st = document.getElementById("stage"), W = innerWidth, H = innerHeight, s = Math.min(W / 1920, H / 1080);
+      if (window.CSS && CSS.supports && CSS.supports("zoom", "0.5")) { st.classList.add("zoomed"); st.style.zoom = s; }
+      else st.style.transform = "translate(" + (W - 1920 * s) / 2 + "px, " + (H - 1080 * s) / 2 + "px) scale(" + s + ")";
+      document.documentElement.classList.add("fitted");
+    })();
+  </script>
+
   <!-- Phone held upright: the 16:9 game would be a thin strip, so ask to turn it (icon only) -->
   <div id="rotate" role="img" aria-label="Turn your phone sideways"><div class="phone"></div></div>
 
-  <!-- Level transition: underwater layer (outside the stage so it doesn't zoom with the camera) -->
-  <div id="under" class="hidden" aria-hidden="true"><div class="rays"></div><div class="bubbles"></div></div>
 
   <script src="js/data.js"></script>
   <script src="js/lang-hi.js"></script>  <!-- Hindi lines -->

@@ -179,6 +179,7 @@
       const finish = (cut) => {
         if (done) return;
         done = true;
+        window.dispatchEvent(new CustomEvent("fx:buffering", { detail: false }));
         if (line && line.text === text) { line = null; if (!cut) lastLine = text; }
         clearTimeout(timer);
         clearInterval(poll);
@@ -222,9 +223,14 @@
           stopClip();
           startSynth();
         };
+        // slow network (2026-10-19 QA): while the clip is still on its way, say so (game.js shows a
+        // ring around 🔊) and keep waiting for it instead of switching to the browser voice
+        const waiting = setTimeout(() => { if (!started && !done) window.dispatchEvent(new CustomEvent("fx:buffering", { detail: true })); }, 700);
         voEl.onplaying = () => {
           if (started) return;
           started = true;
+          clearTimeout(waiting);
+          window.dispatchEvent(new CustomEvent("fx:buffering", { detail: false }));
           clearTimeout(timer);                           // a generous cap only guards against a stuck element
           timer = setTimeout(finish, ((voEl.duration || 10) * 3 + 10) * 1000);
         };
@@ -236,7 +242,15 @@
         voEl.volume = 1;
         const p = voEl.play();
         if (p && p.catch) p.catch((e) => toSynth(e && e.name));
-        timer = setTimeout(() => { if (!started) toSynth("did not start"); }, 5000);
+        const giveUp = () => {
+          if (started || done) return;
+          // still loading (not an error): wait up to 25 s in all; then the browser voice reads it
+          if (voEl.networkState === 2 && performance.now() - t0 < 25000) { timer = setTimeout(giveUp, 1000); return; }
+          clearTimeout(waiting);
+          window.dispatchEvent(new CustomEvent("fx:buffering", { detail: false }));
+          toSynth("did not start");
+        };
+        timer = setTimeout(giveUp, 5000);
         return;
       }
       startSynth();
@@ -331,6 +345,15 @@
     } finally {
       if (my === gen) duck(false);
     }
+  };
+
+  /** Fetch a line's clip ahead of time, so it starts at once when it is spoken (slow networks). */
+  const fetched = new Set();
+  FX.prefetch = (text, speaker) => {
+    const clip = FX.clipFor(text, speaker);
+    if (!clip || fetched.has(clip) || typeof fetch !== "function") return;
+    fetched.add(clip);
+    try { fetch(clip, { priority: "low" }).then((r) => r.blob()).catch(() => fetched.delete(clip)); } catch (e) {}
   };
 
   FX.stopSpeech = () => { gen++; if (synth) synth.cancel(); voEl.pause(); duck(false); };

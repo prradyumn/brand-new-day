@@ -2,12 +2,14 @@
    Language: English (default) or Hindi (js/lang-hi.js).
 
    The choice comes from ?lang=hi|en or the last one used (localStorage). For
-   Hindi every game line in GAME_DATA is swapped for its Hindi line before the
-   game starts, so the engine (game.js) runs exactly the same; the recorded
-   Hindi voice is looked up by the Hindi line (assets/vo/manifest.js).
+   Hindi every game line in GAME_DATA is swapped for its Hindi line, so the
+   engine (game.js) runs exactly the same; the recorded Hindi voice is looked
+   up by the Hindi line (assets/vo/manifest.js).
 
-   The हिंदी / English button reloads the game at the same step in the other
-   language (a reload, because browsers only allow speech after a tap — press ▶).
+   The language button shows the language in use. A tap switches in place, with
+   no reload (2026-10-19 QA): the lines are swapped in GAME_DATA (an English copy
+   is kept to switch back), the page text and the address follow, and game.js
+   ("langchange") plays the current step again in the new language.
    tools/generate-audio.mjs uses I18N.translateGame to record the Hindi lines.
    ===================================================================== */
 (function () {
@@ -36,7 +38,7 @@
         (part.wrong || []).forEach((w) => { w.text = t(w.text); });
         if (part.idle) part.idle.text = t(part.idle.text);
       }
-      if (pack.steps && pack.steps[step.id]) Object.assign(step, pack.steps[step.id]);   // cue words inside the lines
+      if (pack.steps && pack.steps[step.id]) Object.assign(step, JSON.parse(JSON.stringify(pack.steps[step.id])));   // cue words inside the lines (a copy: switching back must not change the pack)
     }
     for (const k in data.ui) if (pack.ui[k]) data.ui[k] = pack.ui[k];
     data.cues = pack.cues;
@@ -48,34 +50,52 @@
   window.I18N = { tr, translateGame, packs: PACKS };
   if (typeof document === "undefined" || typeof location === "undefined") return;   // tools/ (no page)
 
+  const data = window.GAME_DATA;
+  const EN = JSON.parse(JSON.stringify({ steps: data.steps, ui: data.ui, speechLang: data.config.speechLang }));
+  const pageText = {};                                            // the page's own English text (data-i18n)
+  document.querySelectorAll("[data-i18n]").forEach((n) => { pageText[n.dataset.i18n] = n.innerHTML; });
+
+  /** Copy every value of `src` into `dst`, keeping the objects the game already holds. */
+  function copyInto(dst, src) {
+    for (const k of Object.keys(src)) {
+      const v = src[k];
+      if (v && typeof v === "object" && dst[k] && typeof dst[k] === "object") copyInto(dst[k], v);
+      else dst[k] = v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v;
+    }
+  }
+  function apply(lang) {
+    data.steps.forEach((st, i) => copyInto(st, EN.steps[i]));   // back to English first
+    copyInto(data.ui, EN.ui);
+    data.cues = undefined;
+    data.config.speechLang = EN.speechLang;
+    const pack = PACKS[lang];
+    if (pack) translateGame(data, pack);
+    window.LANG = lang;
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((n) => {
+      const v = pack && pack.html[n.dataset.i18n] != null ? pack.html[n.dataset.i18n] : pageText[n.dataset.i18n];
+      if (v != null) n.innerHTML = v;
+    });
+    const btn = document.getElementById("btnLang");
+    if (btn) btn.setAttribute("aria-label", lang === "hi" ? "भाषा: हिंदी (English में बदलें)" : "Language: English (switch to Hindi)");
+    try { localStorage.setItem("lang", lang); } catch (e) {}
+    try {
+      const q = new URLSearchParams(location.search); q.set("lang", lang);
+      history.replaceState(null, "", "?" + q.toString() + location.hash);
+    } catch (e) {}
+  }
+
   const url = new URLSearchParams(location.search);
   let lang = url.get("lang");
   try { if (!lang) lang = localStorage.getItem("lang"); } catch (e) {}
   if (!PACKS[lang]) lang = "en";
-  try { localStorage.setItem("lang", lang); } catch (e) {}
-  window.LANG = lang;
-  document.documentElement.lang = lang;
+  apply(lang);
 
-  const pack = PACKS[lang];
-  if (pack) translateGame(window.GAME_DATA, pack);
-  // the page's own text (index.html data-i18n="title" / "check" / "langBtn")
-  document.querySelectorAll("[data-i18n]").forEach((n) => {
-    const v = pack && pack.html[n.dataset.i18n];
-    if (v) n.innerHTML = v;
-  });
-
-  // हिंदी / English: reload at the same step in the other language
   const btn = document.getElementById("btnLang");
-  if (btn) {
-    btn.setAttribute("aria-label", lang === "hi" ? "Switch to English" : "हिंदी में बदलें");
-    btn.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-      const next = new URLSearchParams(location.search);
-      next.set("lang", lang === "hi" ? "en" : "hi");
-      const st = window.__GAME_STATE;
-      if (st && st.stepId) next.set("step", st.stepId); else next.delete("step");
-      try { localStorage.setItem("lang", next.get("lang")); } catch (err) {}
-      location.search = "?" + next.toString();
-    });
-  }
+  if (btn) btn.addEventListener("pointerdown", (e) => {
+    e.stopPropagation(); e.preventDefault();
+    lang = lang === "hi" ? "en" : "hi";
+    apply(lang);
+    window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));   // game.js: the current step again, in this language
+  });
 })();

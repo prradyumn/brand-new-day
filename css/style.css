@@ -17,6 +17,7 @@
 }
 
 * { box-sizing: border-box; }
+html:not(.fitted) #viewport { visibility: hidden; }   /* until the inline script in index.html has sized the stage: no zoomed-in flash (QA Bug 1) */
 html, body {
   margin: 0; height: 100%; overflow: hidden;
   background: #0d1a2e;
@@ -77,7 +78,7 @@ button { font-family: inherit; cursor: pointer; }
 #plateText {
   color: #fff; font-weight: 900; font-size: 78px; line-height: 1;
   text-shadow: 0 4px 0 rgba(0, 40, 110, .45), 0 0 18px rgba(140, 210, 255, .55);
-  transform: translateY(-4px);
+  transform: translateY(2px);   /* the digits' ink sits centred in the display's dark glass (QA Bug 8; measured) */
 }
 #plate.lvl { top: 205px; }              /* level mode (Level 2/3, Figma slide 18–20) */
 #plate.pop { animation: pop .55s var(--ease-spring); }
@@ -98,6 +99,7 @@ button { font-family: inherit; cursor: pointer; }
   border: 30px solid transparent;
   border-image: url(../assets/strip-cream.png) 90 fill / 30px stretch;
   display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding-top: 10px;         /* the strip's cream area sits 5 px below its middle: the cards centre on it (QA Bug 10; measured) */
   font-size: 44px; font-weight: 900; color: var(--navy); white-space: nowrap;
   z-index: 8;                /* fitEq() shrinks the font (and the em-sized cards with it) to stay inside the cream */
 }
@@ -284,6 +286,7 @@ button { font-family: inherit; cursor: pointer; }
   left: 1214px; width: 387px; top: 570px; height: 393px;
   z-index: 10; opacity: .93;
   border-radius: 6px 6px 46px 46px;
+  clip-path: inset(-60px 0 0 0 round 0 0 46px 46px);   /* the sliding waves stay inside the glass sideways; their crests show above */
   background:
     radial-gradient(120% 60% at 30% 100%, rgba(0, 70, 160, .35), transparent 70%),
     linear-gradient(180deg, #6fd6ff 0%, #2fb0f5 22%, #1791e6 60%, #0d6fcf 100%);
@@ -321,10 +324,11 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes lockRipple { from { transform: scale(.15); opacity: 1; } to { transform: scale(1.05); opacity: 0; } }
 @keyframes labPop { 0% { scale: 1; } 35% { scale: 1.55; } 100% { scale: 1; } }
 @media (prefers-reduced-motion: reduce) { #water .caustics, #water .glint { animation: none; } }
-.wave {
-  left: 0; width: 100%; height: 34px; top: -22px;
-  background-repeat: repeat-x; background-size: 200px 34px;
-  position: absolute; pointer-events: none;
+.wave {                    /* one wave length wider than the water and slid sideways (transform only: no repaint every frame) */
+  --wl: 200px;
+  left: 0; width: calc(100% + var(--wl)); height: 34px; top: -22px;
+  background-repeat: repeat-x; background-size: var(--wl) 34px;
+  position: absolute; pointer-events: none; will-change: transform;
 }
 .wave--back {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 34'%3E%3Cpath d='M0 20 Q25 8 50 20 T100 20 T150 20 T200 20 V34 H0Z' fill='%2388ddff'/%3E%3C/svg%3E");
@@ -438,6 +442,8 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes leverRipple { from { opacity: .95; transform: scale(.55); } to { opacity: 0; transform: scale(1.45); } }
 .lever-btn.glow { animation: btnGlow 1s ease-in-out 3; }
 .lever-btn:disabled { cursor: default; }
+.lever-btn:disabled:active { transform: none; }                      /* disabled: no press (QA Bug 7) */
+#panel.locked .key, #panel.locked .pad-btn { pointer-events: none; cursor: default; }   /* keypad not taking keys: no press, no click (QA Bug 7); the demo hand still presses (.down) */
 #stage.lever-lit .lever-btn { z-index: 42; }   /* above the focus glass while the tank is in the spotlight */
 
 /* Marker (Figma "Line 13") */
@@ -471,12 +477,21 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------------- Narrator ---------------- */
 #banner {
   left: 23px; top: 16px; width: 1067px; height: 138px;
-  border: 48px solid transparent;
-  border-image: url(../assets/banner-bar.png) 120 fill / 48px stretch;
+  border: 48px solid transparent;           /* (layout only: the panel is drawn by ::before) */
   z-index: 19;
   transition: transform .4s var(--ease-spring), opacity .3s;
 }
 #banner > * { position: absolute; }
+/* The panel, drawn after banner-bar.png (the 9-slice artwork left faint lines at its seams when the
+   stage is scaled: QA Bug 6): a bright blue rim round a white-to-sky glass, with a soft gloss. */
+#banner::before {
+  content: ""; position: absolute; inset: -48px; z-index: -1; border-radius: 32px;
+  border: 7px solid #1478f0;
+  background:
+    radial-gradient(60px 26px at 34px 22px, rgba(255, 255, 255, .9), transparent 70%),
+    linear-gradient(180deg, #f3fbfd 0%, #eef9fc 45%, #cdeefa 80%, #9fdcf6 100%);
+  box-shadow: inset 0 0 0 3px #f0fbff, inset 0 0 0 5px #3aa0f5, 0 6px 14px rgba(10, 50, 110, .25);
+}
 #avatar {                  /* a frame strip (assets/char/avatar-*.png); game.js picks the frame: mouth, blink */
   left: -39px; top: -42px; width: 114px; height: 114px;
   background-repeat: no-repeat; background-position: 0 0;
@@ -486,12 +501,10 @@ button { font-family: inherit; cursor: pointer; }
 #avatar.none { visibility: hidden; }            /* "Narrator:" lines have no face */
 #bannerText {
   margin: 0; left: 83px; right: -18px; top: -48px; bottom: -48px;
-  display: flex; align-items: center;
-  font-size: 32px; font-weight: 800; line-height: 1.18; color: var(--navy);
+  display: flex; align-items: center; justify-content: center; text-align: center;   /* one or two lines, centred (QA Bug 13) */
+  font-size: 30px; font-weight: 800; line-height: 1.2; color: var(--navy);
 }
-#bannerText { white-space: pre-line; }
-#bannerText.long { font-size: 28px; }
-#banner.speak { transform: scale(1.015); }
+#bannerText { white-space: pre-line; text-wrap: balance; }
 
 /* Full-size Guddu, the game's host (guided steps): big, anchored in the bottom-left
    corner and cropped at the knees by the screen edge, so he never floats. He pops up
@@ -651,6 +664,12 @@ button { font-family: inherit; cursor: pointer; }
   transform: skewX(-18deg); animation: coverSweep 3.2s 1.8s ease-in-out infinite;
 }
 .cover-btn:hover { filter: brightness(1.06); }
+.cover-btn .load-ring { display: none; }
+.cover-btn.loading { cursor: progress; filter: saturate(.7) brightness(.95); animation: coverIn .9s .2s var(--ease-spring) both; }
+.cover-btn.loading .load-ring {   /* how much of the game has loaded */
+  display: block; position: absolute; left: 24px; right: 24px; bottom: 12px; height: 8px; border-radius: 4px;
+  background: linear-gradient(90deg, #fff var(--load, 0%), rgba(255, 255, 255, .3) 0);
+}
 .cover-btn:active { transform: translateY(6px); box-shadow: inset 0 -5px 0 rgba(0, 80, 0, .3), 0 3px 0 #146b12, 0 10px 20px rgba(10, 60, 20, .3), 0 0 0 10px rgba(255, 255, 255, .35); }
 .cover-btn:focus-visible { outline: 6px solid #ffd21a; outline-offset: 6px; }
 .cover #qaStartTag { margin: -10px 0 0; }
@@ -692,7 +711,7 @@ button { font-family: inherit; cursor: pointer; }
     radial-gradient(70% 55% at 50% 40%, rgba(255, 255, 255, .22), transparent 70%),
     linear-gradient(180deg, #6fd6ff 0%, #2fb0f5 16%, #1791e6 52%, #0b5fb8 100%);
 }
-#flood .wave { height: 46px; top: -30px; background-size: 260px 46px; }
+#flood .wave { --wl: 260px; height: 46px; top: -30px; background-size: 260px 46px; }
 #flood .wave--front { top: -18px; }
 #flood .flood-card {
   position: absolute; left: 50%; top: 50%; width: 820px; padding: 96px 90px 104px; box-sizing: border-box; text-align: center;
@@ -834,6 +853,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 #story .twater {
   position: absolute; left: 0; right: 0; top: 342px; height: 368px; opacity: .9;
+  clip-path: inset(-60px 0 0 0);       /* the sliding waves stay inside the glass sideways */
   background:
     radial-gradient(120% 60% at 30% 100%, rgba(0, 70, 160, .35), transparent 70%),
     linear-gradient(180deg, #6fd6ff 0%, #2fb0f5 22%, #1791e6 60%, #0d6fcf 100%);
@@ -905,6 +925,13 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 34px; box-shadow: 0 6px 16px rgba(0,0,0,.2);
 }
 #btnMute { left: 1824px; top: 22px; }
+#voiceWait {
+  left: 1818px; top: 16px; width: 88px; height: 88px; border-radius: 50%; z-index: 96; pointer-events: none;
+  border: 5px solid rgba(255, 255, 255, .35); border-top-color: #ffd34d;
+  opacity: 0; transition: opacity .25s; animation: spin .9s linear infinite;
+}
+#voiceWait.on { opacity: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
 /* Look back (game.js): a speech bubble with a back arrow; dim until something has been said */
 #btnPause, #btnStoryBack, #btnBack { top: 22px; z-index: 99; display: grid; place-items: center; padding: 0; }
 #btnPause { left: 1312px; } #btnStoryBack { left: 1406px; } #btnBack { left: 1500px; }
@@ -964,11 +991,17 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------------- QA level jumper ---------------- */
 #btnJump { left: 1730px; top: 22px; z-index: 99; }
-#btnLang {                 /* English ⇄ हिंदी (shows the language it switches to) */
-  left: 1594px; top: 22px; width: 122px; border-radius: 38px; z-index: 99;
-  font-size: 27px; font-weight: 900; color: #0d3b8c; letter-spacing: .01em;
+#btnLang {                 /* the language in use (QA Bug 16), with a globe: a tap switches English ⇄ हिंदी */
+  left: 1594px; top: 22px; width: 132px; border-radius: 38px; z-index: 99; padding: 0 10px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 23px; font-weight: 900; color: #0d3b8c; letter-spacing: .01em;
 }
+#btnLang svg { width: 24px; height: 24px; flex: none; }
+:lang(hi) #btnLang b { font-size: 26px; }
 :lang(hi) #bannerText, :lang(hi) #bubbleText, :lang(hi) #hostBubble p { line-height: 1.3; }   /* room for Devanagari marks */
+/* Hindi: one face for every box (Nunito has no Devanagari, so the browser mixed in a system font: QA Bug 14) */
+:lang(hi) body, :lang(hi) button, :lang(hi) #bannerText, :lang(hi) #bubbleText, :lang(hi) #hostBubble p,
+:lang(hi) #caption, :lang(hi) #revText, :lang(hi) #revNote, :lang(hi) .flood-card h2 { font-family: "Baloo 2", system-ui, sans-serif; }
 #jumper {
   inset: 0; width: 1920px; height: 1080px; z-index: 98;
   display: grid; place-items: center;
@@ -1038,7 +1071,7 @@ button { font-family: inherit; cursor: pointer; }
 
 
 /* ---------------- Keyframes ---------------- */
-@keyframes waveX { from { background-position-x: 0; } to { background-position-x: 200px; } }
+@keyframes waveX { from { transform: translateX(calc(-1 * var(--wl))); } to { transform: translateX(0); } }
 @keyframes bubbleUp {
   0% { transform: translate(0, 0); opacity: 0; }
   10% { opacity: .9; }

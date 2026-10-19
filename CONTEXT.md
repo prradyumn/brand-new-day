@@ -42,7 +42,7 @@ Script load order matters: `data.js` → `assets/vo/manifest.js` → `fx.js` →
 
 ## 2a. Languages: English and Hindi
 
-* **Choosing:** the हिंदी / English button (top right, `#btnLang`) switches language. It reloads the game at the same step (`?lang=hi&step=ID`, then press ▶, because browsers only allow speech after a tap). The choice is remembered (localStorage), and `?lang=en|hi` also works in a link.
+* **Choosing:** the language button (top right, `#btnLang`: a globe and the language in use, "English" / "हिंदी") switches language **in place, with no reload** (2026-10-19 QA Bugs 2, 16): `js/lang.js` swaps every line in `GAME_DATA` (it keeps an English copy to switch back), updates the page text and the address (`?lang=hi`, `history.replaceState`) and the stored choice, and sends `langchange`; `game.js` then plays the current step again in the new language (a question: its instruction again). `?lang=hi|en` still picks the language on load.
 * **How it works:** `js/lang.js` runs before the game. For Hindi it swaps every line of `GAME_DATA` (VO, OST, correct and wrong lines, idle prompts, buttons, `ui`) for its Hindi line from `js/lang-hi.js`, so `game.js` runs exactly the same. The page's own text (title, Check) uses `data-i18n`. The equation cue words are per language too (`cues`, and `steps` for P2, P3).
 * **`js/lang-hi.js`:** `exact` holds the one-off lines and `patterns` the lines that differ only by their numbers. Equations ("(+4) + 3 = ?") stay as they are. A line with no translation is logged as `[lang] no translation for: …` and shows in English: add it to `lang-hi.js`. The current script translates completely.
 * **Hindi teaching choices** (the header of `lang-hi.js` has the full list):
@@ -110,11 +110,11 @@ Start screen (▶ = user gesture, unlocks speech; the first story scene sits beh
   Story        ST1–ST10  full-screen scenes (CSV Intro, Teaching, Game start), speech bubbles + VO
   ── chapter break: the screen floods, "How to Play" card, tap ▶, the water drains ──
   How to Play  H1–H5  guided demo (blur + spotlight + hand): ▲/▼ taps, drag to +4, pick + then type 4 (sign first), Check
-  ── dive ──
+  ── level card ("Level 1", flood, ~2 s) ──
   Level 1      L1T    tutorial, learner plays (blur + spotlight): +2 → 0, then enter 0
                TR1    "Start" button → tank scale and dial become active
                Q1…Q6  0→+2, +2→+6, +6→+3, +3→−1, −1→+3, +3→−2   (marker, then keypad)
-  ── dive ──
+  ── level card ("Level 1", flood, ~2 s) ──
   Level 2      P1–P4  teaching rows (Story V3): P1 "Let's see where the water level reaches", P2 (+1) + 2 = +3 and
                       P3 (+3) − 5 = −2 written in the equation panel as the marker moves, P4 Pari "rises → add, goes down → subtract"
                TR2    Pari: "Let's calculate the water levels exactly!" (OST "Calculate the Water Level!"); tap to continue; the water goes to 0, the equation panel shows 0 + 3 = ? and Guddu reads it
@@ -122,7 +122,7 @@ Start screen (▶ = user gesture, unlocks speech; the first story scene sits beh
                A1…A6  (+2) + 3, (−2) + 4, (+3) − 5, (−2) − 3, (−5) + 2, (−3) − 4
                       (in A0–A6 the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3)
                E2     "Level Complete!" board + confetti
-  ── dive ──
+  ── level card ("Level 1", flood, ~2 s) ──
   Level 3      R2–R6  "the lever isn't working now": ▲/▼ switch off, keypad glows, first challenge appears (S0 "Let's mark some more water levels." removed, 2026-10-14)
                B1…B7  0 + 4, (+4) + 3, (+3) − 6, (−1) + 5, (−6) − 2, (+6) + 3, 0 − 5  (keypad, full feedback ladder;
                       the lever moves by itself)
@@ -192,7 +192,7 @@ Story End scenes (`p11` and `p12` were made for the ending: sunny, the rain has 
   * Water floods up from the bottom of the screen (waves, bubbles, fill sound), and on story → game, a title card with the CSV section name floats up in it (`DATA.ui.howTo`). Then the card floats off and the water drains away (drain sound), revealing what was set up underneath.
   * **Story → game:** "How to Play", and the learner taps ▶ to go on.
   * **Game → Story End:** no card. The water rises and drains straight into the ending.
-  * Level changes inside the game keep their own dive into the tank, so the chapter breaks look different from them. With reduce-motion on, the flood is a quick fade.
+  * Level changes use the same flood with the level's name on the card ("Level 1", `DATA.ui.level1`…), up for 2 s with no tap (2026-10-19 QA Bugs 5, 9: the old zoom-in dive was abrupt and the screens around it went by too fast). With reduce-motion on, the flood is a quick fade.
 * **Moving water in the story (ST5–ST9).** These scenes use empty-tank versions of the art (`scene-p07e/p08e/p09e/p10e.jpg`, from `assets/scene_pXX_tank_empty.png`). The game draws the water, waves, bubbles, glass shine and the −3…+3 scale inside the glass (`tankLayers()` in `game.js`).
   * **Layers**, bottom to top: scene art, the water layer (`.tank-fx`), then the characters (`chars-pXXe.png`, cut out of the same art with macOS Vision), so Guddu's pointing hand stays in front of the water. Glass interior: 852–1238 × 228–938; level 0 at y 570, 90 px per level (`ST_TANK`).
   * **Data:** a step's `tank: { from }` sets the starting level. Its `glow` then lists levels instead of [x, y]: the water rises or falls to each one before it lights. `tank: { from, to }` (ST9) moves the water to one level while the marks light.
@@ -254,11 +254,11 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 * **⏮ Back a step** (HUD `#btnStoryBack`, everywhere, 2026-10-14; `goBack()` in `game.js`). In a story scene, a How to Play step, a spoken row or a gate it stops the step and plays the one before it again (same kind, same part of the game; otherwise this one starts again), and the board goes back to how it was when that step began (`snapshot()` / `restore()`). In a question it speaks the instruction again (`replayInstruction()`). On the "How to Play" card it brings the last scene back (`floodWipe(…, { undo })`). ⏸ is a toggle: it turns into ▶ while paused.
 * **Look back** (the speech-bubble ◀ button in the HUD, `#btnBack`; `said`, `openReview()` in `game.js`). It opens a card with the lines spoken so far, newest first: the speaker's face, the line, and the words that stayed on screen after it (`noteOst()`: "Water level rises → Add", "Move the lever 3 levels up."). It plays the line's voice. ◀ goes to an earlier line, ▶ a later one, 🔊 plays it again, and ✕ (or Esc, or a tap outside) closes it. Only icons are added; every line shown is one the game spoke. While the card is up the game holds (`FX.hold()`): the line that was playing stops and starts again from the beginning when the card closes; every `FX.sleep()` waits, and the word timing doesn't count the held time. The button is dim until the first line has been spoken.
 
-### Transitions (`flipCards()`, `diveWipe()` in `game.js`)
+### Transitions (`flipCards()`, `levelWipe()`, `floodWipe()` in `game.js`)
 
 * **Next question in the same level → card flip** (≈0.8 s) of the display and the equation.
-* **New level → dive into the tank** (≈2.6 s): How to Play → Level 1, Level 1 → Level 2, Level 2 → Level 3. The next level is set up underwater (`levelWipe()`).
-* With reduce-motion on, the flip becomes an instant swap and the dive a 0.25 s fade.
+* **New level → the level card** (≈4.5 s): How to Play → Level 1, Level 1 → Level 2, Level 2 → Level 3. The screen floods, the card ("Level 2") stays up 2 s while the next level is set up underneath, and the water drains.
+* With reduce-motion on, the flip becomes an instant swap and the flood a short fade.
 
 ## 5. Focus / glass effect
 
@@ -299,7 +299,7 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 | `plate-blue.png` | Number plate (Group 20) |
 | `panel-cream.png` | Keypad panel frame (Group 19). Stretched with CSS `border-image` |
 | `strip-cream.png` | Equation strip background |
-| `banner-bar.png` | Narrator bar. The old single-frame avatars (`guddu-happy/sad/think.png`, `pari-happy.png`, `guddu-full.png`, `pari-full.png`) are no longer used: see `assets/char/` |
+| `banner-bar.png` | The narrator bar's original art. Since 2026-10-19 the bar is drawn in CSS after it (`#banner::before`), because the 9-slice image left faint lines at its seams when scaled (QA Bug 6). The old single-frame avatars (`guddu-happy/sad/think.png`, `pari-happy.png`, `guddu-full.png`, `pari-full.png`) are no longer used.
 | `board-green.png` | "Water Level Marked!" board |
 | `panel-title.png` | Start/end card |
 | `drop.png` | Water drop (user-supplied reference, trimmed to 480 px). Currently unused: it was the earlier drop wipe, kept for later use |
@@ -307,7 +307,7 @@ Each part (`lever`, `entry`) has its own CSV row: `vo`, `ost`, `correct`, `wrong
 | `sfx/water-drain.mp3` | Mixkit "Sink drain" (#1878), trimmed to a 10 s loop. Mixkit Free Sound Effects License |
 | `sfx/key.wav` · `lever.wav` · `tick.wav` · `button.wav` · `board.wav` · `wrong.wav` · `flip.wav` | Mixkit #1120 click box check · #2568 interface click tone · #1317 water bubble · #3005 light pop · #2357 bubble pop-up · #2569 negative tone tap · #1104 page turn. Trimmed so each starts on its first sound, peak-normalised, and saved as WAV so short clicks don't lag. Mixkit Free Sound Effects License |
 | `sfx/correct.mp3` · `confetti.mp3` · `complete.mp3` | Mixkit #3193 bubbly achievement tone · #2359 silly pop cluster · #2059 game level completed. Trimmed and normalised the same way |
-| `sfx/splash-in.mp3` · `bubbles.mp3` · `splash-out.mp3` | Level-transition dive: Mixkit #1304 jumping into water · #1321 deep water bubbles · #1311 water splash |
+| `sfx/splash-in.mp3` · `bubbles.mp3` · `splash-out.mp3` | Chapter and level floods: Mixkit #1304 jumping into water · #1321 deep water bubbles · #1311 water splash |
 
 The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma key style. The Figma keypad image only has 0–6, and Q6 needs 7.
 
@@ -332,6 +332,18 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 * The flow was checked end to end with a Playwright script: all 48 steps, wrong lever and keypad attempts (the full 3-step ladder on L1T and B3), inactivity on both part types, both gates, and the end screen.
 
 ## 10. Known decisions / open points
+
+* **QA bug round 2026-10-19** (Lenovo ThinkPad, i5-6300U):
+  * Bug 1 (zoomed-in flash on load): an inline script in `index.html` sizes the stage before the game scripts load, and `#viewport` stays hidden until it has (`html.fitted`). The Start button shows a loading bar and works once the game has loaded.
+  * Bugs 2, 16 (language): switches in place, no reload; the button shows the language in use (see §2a).
+  * Bug 3 (jerky transitions): the waves slide with `transform` (no repaint each frame; `--wl`, clipped to the glass with `clip-path`), story pictures are decoded before they fade in, and the zoom dive between levels is gone.
+  * Bugs 4, 6, 13 (panel text shifting, faded lines, two-line alignment): the bar is drawn in CSS (no seams), every line uses one font size (30 px, smaller only if it would spill), the scale "pulse" on each new line is gone, and the text is centred.
+  * Bugs 5, 9: the level card (see Transitions).
+  * Bug 7: a keypad that isn't taking keys (`#panel.locked`, `setPadLive()`) and disabled ▲/▼ show no press.
+  * Bugs 8, 10: the display's digits and the equation cards are centred on the art's inner areas (measured: digits +2 px, cards +5 px).
+  * Bug 14: all Hindi text uses Baloo 2 (Nunito has no Devanagari, so a system font was mixed in).
+  * Bug 15 (slow network): clips carry a version tag (`…mp3?v=…`, from their content: `tools/generate-audio.mjs`) and are cached for a year (`vercel.json`); pictures and sounds for a day; the clips of the next steps are fetched ahead (`prefetchVoice()`, `FX.prefetch`); a clip still loading is waited for (up to 25 s) instead of switching to the browser voice, with a ring round 🔊 meanwhile (`fx:buffering`).
+  * **Not applied, against the 2026-10-12 review (Varsha):** Bug 11 (keep the question fixed while the lever moves: the equation follows the lever, as she asked) and Bug 12 (keypad only after Guddu finishes: it works from the lever's lock, because she found the wait too long).
 
 * **QA round 2026-10-14** (all levels):
   * **One instruction at a time:** the narrator box (and Guddu's bubble) shows a line a sentence at a time as it is spoken, a short sentence ("Try again.", "Great!") kept with its neighbour (`chunks()`, `followChunks()`); afterwards the last piece stays (`setBanner()` always shows one piece). When the last spoken piece and the sheet's OST say the same thing, the OST wording is used, so nothing flips.
