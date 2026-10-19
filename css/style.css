@@ -502,7 +502,7 @@ button { font-family: inherit; cursor: pointer; }
 #bannerText {
   margin: 0; left: 83px; right: -18px; top: -48px; bottom: -48px;
   display: flex; align-items: center; justify-content: center; text-align: center;   /* one or two lines, centred (QA Bug 13) */
-  font-size: 30px; font-weight: 800; line-height: 1.2; color: var(--navy);
+  font-size: 32px; font-weight: 800; line-height: 1.2; color: var(--navy);
 }
 #bannerText { white-space: pre-line; text-wrap: balance; }
 

@@ -337,7 +337,7 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
   * Bug 1 (zoomed-in flash on load): an inline script in `index.html` sizes the stage before the game scripts load, and `#viewport` stays hidden until it has (`html.fitted`). The Start button shows a loading bar and works once the game has loaded.
   * Bugs 2, 16 (language): switches in place, no reload; the button shows the language in use (see §2a).
   * Bug 3 (jerky transitions): the waves slide with `transform` (no repaint each frame; `--wl`, clipped to the glass with `clip-path`), story pictures are decoded before they fade in, and the zoom dive between levels is gone.
-  * Bugs 4, 6, 13 (panel text shifting, faded lines, two-line alignment): the bar is drawn in CSS (no seams), every line uses one font size (30 px, smaller only if it would spill), the scale "pulse" on each new line is gone, and the text is centred.
+  * Bugs 4, 6, 13 (panel text shifting, faded lines, two-line alignment): the bar is drawn in CSS (no seams), every line uses one font size (32 px, smaller only if it would spill), the scale "pulse" on each new line is gone, and the text is centred.
   * Bugs 5, 9: the level card (see Transitions).
   * Bug 7: a keypad that isn't taking keys (`#panel.locked`, `setPadLive()`) and disabled ▲/▼ show no press.
   * Bugs 8, 10: the display's digits and the equation cards are centred on the art's inner areas (measured: digits +2 px, cards +5 px).

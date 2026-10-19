@@ -132,7 +132,7 @@
   window.__GAME_STATE = S; // exposed for debugging / automated tests
   // the web fonts change text widths once they arrive: fit the equation and the narrator box again
   if (document.fonts) {
-    const refit = () => { fitEq(); fitText(el.bannerText, 30); };
+    const refit = () => { fitEq(); fitText(el.bannerText, 32); };
     document.fonts.ready.then(refit);
     document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", refit);
   }
@@ -558,7 +558,7 @@
     text = lastChunk(text);
     const same = el.bannerText.textContent === text;
     el.bannerText.textContent = text;
-    if (!same) fitText(el.bannerText, 30);                 // one size for every line; smaller only if it would spill (2026-10-19 QA: text jumped)
+    if (!same) fitText(el.bannerText, 32);                 // one size for every line (32 px); smaller only if it would spill (2026-10-19 QA: text jumped)
     setAvatar(mood);
     if (el.stage.classList.contains("host")) {              // Guddu is on screen: his line is in his bubble, never also in the box
       placeBubble({ shape: "wide", tail: "left", w: 560, tip: (el.charArt.sprite || POSES.talk).tip }, text, el.hostBubble);
