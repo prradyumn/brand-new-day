@@ -205,7 +205,7 @@ function voiceMp3(wav, out) {
   // trim silence at both ends, even loudness, small mono MP3
   const trim = "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05";
   ffmpeg(["-i", "pipe:0", "-af", `${trim},areverse,${trim},areverse,loudnorm=I=-16:TP=-1.5:LRA=7`,
-    "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "64k", out], wav);
+    "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "48k", "-map_metadata", "-1", out], wav);
 }
 
 /* ---------------------------------------------------------------------
@@ -293,7 +293,7 @@ async function makeMusic() {
     `[a]atrim=${X}:${L - X},asetpts=PTS-STARTPTS[body];[b]atrim=${L - X}:${L},asetpts=PTS-STARTPTS[tail];` +
     `[c]atrim=0:${X},asetpts=PTS-STARTPTS[head];[tail][head]acrossfade=d=${X}:c1=tri:c2=tri[seam];` +
     `[body][seam]concat=n=2:v=0:a=1,loudnorm=I=-30:TP=-9:LRA=11[out]`,
-    "-map", "[out]", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", path.join(ROOT, "assets/music/bg-loop.mp3")]);
+    "-map", "[out]", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "64k", path.join(ROOT, "assets/music/bg-loop.mp3")]);
   fs.unlinkSync(raw);
   console.log("  music: assets/music/bg-loop.mp3");
 }

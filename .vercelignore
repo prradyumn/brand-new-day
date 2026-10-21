@@ -3,7 +3,9 @@ Integers_LBD_assets/
 .vscode/
 .DS_Store
 tools/
-# Story source art: the game loads assets/story/*.jpg (web copies) and the two bubble PNGs
+# Source art: the game loads only the .webp copies (2026-10-21), so no PNG/JPG is ever fetched
+assets/**/*.png
+assets/**/*.jpg
 assets/scene_p*_background_clean.png
 assets/scene_p*_tank_empty.png
 assets/dialogue_p*.png
