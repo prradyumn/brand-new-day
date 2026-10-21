@@ -46,9 +46,10 @@ window.GAME_DATA = {
        start / target   lever level at the start / the answer
        eq               { a, op, b } shown as "(+2) + 3 = ?" (Level 2, Level 3). Rule: b is never
                         negative (no "+ (−3)"): the water going down is written as "− 3"
-       liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3 (all of Level 2; going
-                        down it reads (+2) − 1, never "+ (−1)"). QA 2026-10-19 Bug 11 asked for the
-                        question to stay fixed: not applied, it goes against the 2026-10-12 review.
+       liveEq           the equation follows the lever: 0 + 1 → 0 + 2 → 0 + 3 (going down it reads
+                        (+2) − 1, never "+ (−1)"). Was on for all of Level 2 (2026-10-12 review); off
+                        since 2026-10-21: the question "(+2) + 3 = ?" stays until it is answered, so
+                        the learner can recall it (QA Bug 11; the question sentence also stays, S.ask)
        autoLever        Level 3: the lever is off; it moves by itself after a correct answer
                         (Level 2/3 equations build with the question's VO: the sign on
                         "rises"/"goes up"/"goes down", the number on "3 levels", then "= ?")
@@ -243,7 +244,7 @@ window.GAME_DATA = {
     /* ======================= LEVEL 2 GAME ======================= */
     {
       type: "question", id: "A0", section: "level2",
-      start: 0, target: 3, eq: { a: 0, op: "+", b: 3 }, liveEq: true,   // Tutorial: 0 + 3 = ?
+      start: 0, target: 3, eq: { a: 0, op: "+", b: 3 },   // Tutorial: 0 + 3 = ?
       lever: {
         vo: "The water level is at 0. It goes up 3 levels. Move the lever 3 levels up.",
         ost: "Move the lever 3 levels up.",
@@ -398,11 +399,11 @@ function q1(id, start, target, vo, wrong2fx, idleFx) {
   };
 }
 
-/** Level 2 example: lever part + keypad part, with the equation panel (it follows the lever). */
+/** Level 2 example: lever part + keypad part, with the equation panel (the question stays up until it is answered). */
 function q2(id, start, target, eq, vo, ost, wrong2, count, idle, leverCorrect, entryCorrect) {
   const t = signed(target);
   return {
-    type: "question", id, section: "level2", start, target, eq, liveEq: true,
+    type: "question", id, section: "level2", start, target, eq,
     lever: {
       vo, ost,
       correct: leverCorrect || `Yes, the water level is at ${t}.`,             // Lever locks at … (2026-10-14 QA: not "Correct!" twice; sheet: "Correct! You reached …")
