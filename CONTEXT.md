@@ -333,6 +333,9 @@ The keypad keys, the Check button and ⌫ are drawn in CSS to match the Figma ke
 
 ## 10. Known decisions / open points
 
+* **QA re-test 2 (2026-10-21):**
+  * Bug 15 (laggy on a slow network): the game downloaded 22 MB of art before Start worked (63.5 s at 3 Mbps). Now all art is WebP (`cwebp -q 88 -alpha_q 100`; 23.5 MB → 6.8 MB; the PNG/JPG sources stay in the repo, unused), and it loads in stages: before Start only the cover and the first two story pictures (2.1 MB: Start works after 6.7 s at 3 Mbps), then the rest of the story, the game's own art (in 15 s at 3 Mbps, long before the story ends) and the Story End last. The music is 64 kbps (1.3 MB, was 2.7 MB) and loads from the Start tap.
+  * New: the voice of the previous screen went on over the cover after a reload. The browser voice (the slow-network fallback) can outlive the page in Chrome; it is now cancelled as the page loads, and on a page restored from the back/forward cache.
 * **QA re-test 2026-10-21** (items still open after 10-19):
   * Bug 3 (jerky): measured with frame timings. The spotlight's full-screen backdrop blur held How to Play at ~25 fps (37–45 slow frames in 4 s); it is now a dark tint with no blur (`#focus`): 61 fps, 0 slow frames, and the level card 55 → 61 fps. Also moved to GPU-only motion: the water's light patterns (`.caustics` layers, `caustA`/`caustB`), the surface glint, the spotlight sweep and the cover button sweep (they animated `background-position` or `left`); the spotlight halo no longer "breathes" (an animated box-shadow); the top buttons have no backdrop blur; the outlet stream's turbulence filter no longer animates.
   * Bugs 4, 6: the narrator text starts on the left at the same spot for every line, one line or two (`padding-top` 30 px = two lines centred).

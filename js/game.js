@@ -60,16 +60,16 @@
      (two-frame sets: closed / open); `blink` = the eyes-shut frame. lipLoop() picks the
      frame from the voice (FX.mouth). */
   const AVATARS = {
-    "guddu-happy": { src: "assets/char/avatar-guddu-happy.png", frames: 4, mouth: [0, 1, 2], blink: 3 },
-    "guddu-sad":   { src: "assets/char/avatar-guddu-sad.png",   frames: 2, mouth: [0, 1, 1] },
-    "guddu-think": { src: "assets/char/avatar-guddu-think.png", frames: 2, mouth: [0, 1, 1] },
-    "pari-happy":  { src: "assets/char/avatar-pari-happy.png",  frames: 4, mouth: [0, 1, 2], blink: 3 }
+    "guddu-happy": { src: "assets/char/avatar-guddu-happy.webp", frames: 4, mouth: [0, 1, 2], blink: 3 },
+    "guddu-sad":   { src: "assets/char/avatar-guddu-sad.webp",   frames: 2, mouth: [0, 1, 1] },
+    "guddu-think": { src: "assets/char/avatar-guddu-think.webp", frames: 2, mouth: [0, 1, 1] },
+    "pari-happy":  { src: "assets/char/avatar-pari-happy.webp",  frames: 4, mouth: [0, 1, 2], blink: 3 }
   };
   const POSES = {                                // full-size Guddu (data.js `pose`), feet on the same spot in every strip
     // tip: where the speech bubble's tail points (beside his head, stage px); he stands on the left
-    talk:   { src: "assets/char/guddu-talk.png",   frames: 3, mouth: [0, 1, 2], tip: [352, 352] },
-    point:  { src: "assets/char/guddu-point.png",  frames: 2, mouth: [0, 1, 1], tip: [446, 352] },
-    thumbs: { src: "assets/char/guddu-thumbs.png", frames: 2, mouth: [0, 1, 1], tip: [318, 346] }
+    talk:   { src: "assets/char/guddu-talk.webp",   frames: 3, mouth: [0, 1, 2], tip: [352, 352] },
+    point:  { src: "assets/char/guddu-point.webp",  frames: 2, mouth: [0, 1, 1], tip: [446, 352] },
+    thumbs: { src: "assets/char/guddu-thumbs.webp", frames: 2, mouth: [0, 1, 1], tip: [318, 346] }
   };
 
   /* ---------------- DOM ---------------- */
@@ -1749,8 +1749,8 @@
      `tip` = the tail's point, `text` = [left, top, width, height] of the inner area.
      Each keeps its own proportions; "flip" mirrors the artwork only, never the text. */
   const BUBBLES = {
-    round: { src: "assets/asset_speech_bubble_blank.png", ratio: 600 / 800, tail: "left",  tip: [0.2125, 0.892], text: [0.15, 0.217, 0.715, 0.475] },
-    wide:  { src: "assets/asset_p09_overlay_6218b7e3.png", ratio: 355 / 800, tail: "right", tip: [0.91, 0.983],  text: [0.05, 0.073, 0.90, 0.637] }
+    round: { src: "assets/asset_speech_bubble_blank.webp", ratio: 600 / 800, tail: "left",  tip: [0.2125, 0.892], text: [0.15, 0.217, 0.715, 0.475] },
+    wide:  { src: "assets/asset_p09_overlay_6218b7e3.webp", ratio: 355 / 800, tail: "right", tip: [0.91, 0.983],  text: [0.05, 0.073, 0.90, 0.637] }
   };
   let shotIdx = 0;
 
@@ -1813,7 +1813,7 @@
     const t = tankLayers(shot);
     [t.fx, t.top, t.chars].forEach((n) => n.classList.toggle("tank-off", !on));
     if (!on) return null;
-    t.chars.src = `assets/story/chars-${step.scene}.png`;
+    t.chars.src = `assets/story/chars-${step.scene}.webp`;
     setTankLevel(t, step.tank.from, true);
     return t;
   }
@@ -1859,7 +1859,7 @@
     // cross-fade to the new scene (a repeated scene stays, only its highlights restart;
     // after ⏮ it cross-fades anyway, so the camera starts again from its first frame)
     const cur = el.shots[shotIdx];
-    const src = `assets/story/scene-${step.scene}.jpg`;
+    const src = `assets/story/scene-${step.scene}.webp`;
     let shot = cur;
     if (S.sceneSwap || !cur.classList.contains("on") || !cur.querySelector("img").src.endsWith(src)) {
       S.sceneSwap = false;
@@ -2026,7 +2026,7 @@
     await floodWipe(null, {                          // no card here: the water rises and drains straight into the ending
       during: async () => {
         const shot = el.shots[shotIdx];
-        shot.querySelector("img").src = `assets/story/scene-${step.scene}.jpg`;
+        shot.querySelector("img").src = `assets/story/scene-${step.scene}.webp`;
         shot.querySelector(".spots").innerHTML = "";
         shot.style.transition = "none";
         shot.classList.add("on");
@@ -2467,7 +2467,7 @@
     setBanner(first.ost || (first.lever || first.entry).ost, "happy");
     if (first.type === "scene") {                         // the story's first scene sits behind the start screen
       el.story.classList.remove("hidden");
-      el.shots[0].querySelector("img").src = `assets/story/scene-${first.scene}.jpg`;
+      el.shots[0].querySelector("img").src = `assets/story/scene-${first.scene}.webp`;
       el.shots[0].classList.add("on");
     }
     prepareJump();
@@ -2504,19 +2504,32 @@
     });
   }
 
-  // Preload images so nothing pops in mid-animation
-  const PRELOAD = ["bg", "tank-empty", "pipe-in-dry", "pipe-out-dry", "track",
-    "btn-up", "btn-down", "plate-blue", "panel-cream", "strip-cream", "board-green", "panel-title",
-    "banner-bar",
-    "asset_speech_bubble_blank", "asset_p09_overlay_6218b7e3"].map((n) => `assets/${n}.png`)
-    .concat([...new Set(DATA.steps.filter((s) => s.scene).map((s) => `assets/story/scene-${s.scene}.jpg`))])
-    .concat(DATA.steps.filter((s) => s.tank).map((s) => `assets/story/chars-${s.scene}.png`))
-    .concat([...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src))
-    .concat(["assets/cover.jpg"]);
-  // the Start button shows how much has loaded (a ring), and works once everything has
+  /* Loading in stages (2026-10-21 QA Bug 15, slow networks): Start waits only for what the first
+     screen needs; everything else follows in the background, in the order the game uses it. All
+     art is WebP (6.8 MB in all, was 23.5 MB). A story picture that is still on its way is waited
+     for before it fades in (runScene decodes it first). */
+  const UI = ["bg", "tank-empty", "pipe-in-dry", "pipe-out-dry", "track", "btn-up", "btn-down", "plate-blue",
+    "panel-cream", "strip-cream", "board-green", "panel-title", "asset_speech_bubble_blank", "asset_p09_overlay_6218b7e3"]
+    .map((n) => `assets/${n}.webp`);
+  const SPRITES = [...Object.values(AVATARS), ...Object.values(POSES)].map((a) => a.src);
+  const sceneArt = (st) => [`assets/story/scene-${st.scene}.webp`].concat(st.tank ? [`assets/story/chars-${st.scene}.webp`] : []);
+  const art = (sec) => [...new Set(DATA.steps.slice(START_INDEX).filter((st) => st.scene && st.section === sec).flatMap(sceneArt))];
+  const INTRO = art("story"), ENDING = art("end");
+  const startsInStory = DATA.steps[START_INDEX].type === "scene" && DATA.steps[START_INDEX].section === "story";
+  // before Start: the cover and the first scene (or, starting mid-game, the game's own art)
+  const FIRST = ["assets/cover.webp"].concat(startsInStory ? INTRO.slice(0, 2) : UI.concat(SPRITES));
+  // then: the rest of the story, the game's own art (before the story ends), and the Story End last
+  const LATER = [...new Set(INTRO.slice(2).concat(UI, SPRITES, ENDING))].filter((f) => !FIRST.includes(f));
+  const loadImg = (src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => r(); i.src = src; });
+  // the Start button shows how much of the first screen has loaded
   let loaded = 0;
-  const loadedOne = () => { loaded++; $("btnStart").style.setProperty("--load", Math.round((loaded / PRELOAD.length) * 100) + "%"); };
-  Promise.all(PRELOAD.map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => { loadedOne(); r(); }; i.src = src; })))
-    .then(init);
+  const loadedOne = () => { loaded++; $("btnStart").style.setProperty("--load", Math.round((loaded / FIRST.length) * 100) + "%"); };
+  Promise.all(FIRST.map((src) => loadImg(src).then(loadedOne))).then(() => {
+    init();
+    // the rest, two at a time, in the order the game shows it (the game's own art comes before the story ends)
+    const queue = LATER.slice();
+    const next = () => { const src = queue.shift(); if (src) loadImg(src).then(next); };
+    next(); next();
+  });
   fitStage();
 })();

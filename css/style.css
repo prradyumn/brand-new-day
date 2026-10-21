@@ -63,14 +63,14 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------------- Background ---------------- */
 #bg {
   left: -120px; top: -60px; width: 2152px; height: 1211px;
-  background: url(../assets/bg.png) center / cover no-repeat;
+  background: url(../assets/bg.webp) center / cover no-repeat;
   z-index: 0;
 }
 
 /* ---------------- Number plate (Figma "Group 20") ---------------- */
 #plate {
   left: 273px; top: 265px; width: 501px; height: 167px;   /* centred on the keypad (x 523.5) */
-  background: url(../assets/plate-blue.png) center / 100% 100% no-repeat;
+  background: url(../assets/plate-blue.webp) center / 100% 100% no-repeat;
   display: grid; place-items: center;
   z-index: 7;
   transition: top .6s var(--ease-out), opacity .45s, transform .45s var(--ease-out);
@@ -97,7 +97,7 @@ button { font-family: inherit; cursor: pointer; }
 #eqPanel {                /* top strip of the keypad in level mode */
   left: 270px; top: 433px; width: 507px; height: 146px;   /* same width and centre as the keys */
   border: 30px solid transparent;
-  border-image: url(../assets/strip-cream.png) 90 fill / 30px stretch;
+  border-image: url(../assets/strip-cream.webp) 90 fill / 30px stretch;
   display: flex; align-items: center; justify-content: center; gap: 7px;
   padding-top: 10px;         /* the strip's cream area sits 5 px below its middle: the cards centre on it (QA Bug 10; measured) */
   font-size: 44px; font-weight: 900; color: var(--navy); white-space: nowrap;
@@ -138,7 +138,7 @@ button { font-family: inherit; cursor: pointer; }
 #panel {
   left: 214px; top: 451px; width: 619px; height: 498px;
   border: 56px solid transparent;
-  border-image: url(../assets/panel-cream.png) 110 fill / 56px stretch;
+  border-image: url(../assets/panel-cream.webp) 110 fill / 56px stretch;
   z-index: 6;
   transition: top .6s var(--ease-out), height .6s var(--ease-out), opacity .45s, transform .45s var(--ease-out);
 }
@@ -371,7 +371,7 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------------- Lever track (Figma "Group 21") ---------------- */
 #track {
   left: 1094px; top: 102px; width: 114px; height: 945px;
-  background: url(../assets/track.png) center / 100% 100% no-repeat;
+  background: url(../assets/track.webp) center / 100% 100% no-repeat;
   z-index: 12;
 }
 #rail {
@@ -433,8 +433,8 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 16; border: 0; padding: 0; background: center / contain no-repeat;
   transition: transform .12s, filter .2s;
 }
-#btnUp   { left: 1078px; top: 43px;  width: 143px; height: 143px; background-image: url(../assets/btn-up.png); }
-#btnDown { left: 1078px; top: 952px; width: 145px; height: 145px; background-image: url(../assets/btn-down.png); }
+#btnUp   { left: 1078px; top: 43px;  width: 143px; height: 143px; background-image: url(../assets/btn-up.webp); }
+#btnDown { left: 1078px; top: 952px; width: 145px; height: 145px; background-image: url(../assets/btn-down.webp); }
 .lever-btn:active { transform: scale(.92); }
 .lever-btn:hover:not(:disabled) { filter: brightness(1.08); }
 /* press feedback (learner taps and the tutorial hand): squash + ripple ring */
@@ -610,7 +610,7 @@ button { font-family: inherit; cursor: pointer; }
 .cover { inset: 0; width: 1920px; height: 1080px; z-index: 90; overflow: hidden; background: #8fc8ef; transition: opacity .6s, transform .6s; }
 .cover.fade { opacity: 0; transform: scale(1.04); pointer-events: none; }
 .cover-art {
-  position: absolute; inset: -2%; background: url(../assets/cover.jpg) center / cover no-repeat;
+  position: absolute; inset: -2%; background: url(../assets/cover.webp) center / cover no-repeat;
   animation: coverDrift 22s ease-in-out infinite alternate;
 }
 .cover-art::after {        /* a soft light veil behind the title, so it reads on the sky */
@@ -703,7 +703,7 @@ button { font-family: inherit; cursor: pointer; }
 .card {
   width: 980px; padding: 40px 60px 70px; text-align: center;
   padding: 110px 110px 120px;
-  background: url(../assets/panel-title.png) center / 100% 100% no-repeat;
+  background: url(../assets/panel-title.webp) center / 100% 100% no-repeat;
   animation: pop .7s var(--ease-spring);
 }
 .card h1 { margin: 0 0 16px; font-size: 92px; line-height: 1; font-weight: 900; color: #0d3b8c; text-shadow: 0 4px 0 rgba(255,255,255,.8); }
@@ -722,7 +722,7 @@ button { font-family: inherit; cursor: pointer; }
 #flood .wave--front { top: -18px; }
 #flood .flood-card {
   position: absolute; left: 50%; top: 50%; width: 820px; padding: 96px 90px 104px; box-sizing: border-box; text-align: center;
-  background: url(../assets/panel-title.png) center / 100% 100% no-repeat;
+  background: url(../assets/panel-title.webp) center / 100% 100% no-repeat;
   opacity: 0; transform: translate(-50%, 60%) scale(.9);
   transition: opacity .4s, transform .9s var(--ease-spring);
 }
@@ -779,7 +779,7 @@ button { font-family: inherit; cursor: pointer; }
 .cross-badge { background: radial-gradient(circle at 35% 30%, #ffb3a8, #ef4a3c 60%, #b7231a); box-shadow: 0 10px 30px rgba(0,0,0,.35); animation-duration: .9s; }
 #markedBadge {             /* sits over the number display, centred on it */
   left: 173.5px; top: 259.5px; width: 700px; height: 178px;
-  background: url(../assets/board-green.png) center / 100% 100% no-repeat;
+  background: url(../assets/board-green.webp) center / 100% 100% no-repeat;
   display: grid; place-items: center; z-index: 61; pointer-events: none;
   opacity: 0; transform: scale(.4) translateY(-30px);
 }

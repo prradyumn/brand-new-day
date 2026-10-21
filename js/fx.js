@@ -133,6 +133,11 @@
   const silence = () => { if (synth) synth.cancel(); voEl.pause(); FX.stopSfx && FX.stopSfx(true); music.a && music.a.pause(); };
   window.addEventListener("pagehide", silence);
   window.addEventListener("beforeunload", silence);
+  // …and on load: the browser voice (the slow-network fallback) can carry on from the page that
+  // was just reloaded, over the new cover (2026-10-21 QA). A page shown again from the back/forward
+  // cache is silenced too.
+  try { if (synth) synth.cancel(); } catch (e) {}
+  window.addEventListener("pageshow", (e) => { if (e.persisted) silence(); });
 
   let gen = 0; // bumped by every new line and by stopSpeech(), so stale lines never replay
   const muteHooks = new Set();
@@ -421,7 +426,7 @@
   const music = { a: null, base: 0.7, on: false, ducked: false, fade: null };
   FX.loadMusic = (url, vol = 0.7) => {
     const a = new Audio(url);
-    a.loop = true; a.preload = "auto"; a.volume = 0;
+    a.loop = true; a.preload = "none"; a.volume = 0;   // loads from the Start tap, not alongside the first screen (slow networks)
     music.a = a; music.base = vol;
   };
   /** Call from the Play click (a user gesture). */
