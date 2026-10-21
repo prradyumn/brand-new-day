@@ -124,6 +124,7 @@
     guided: false,       // spotlight/blur + character
     eqLive: false,       // the equation follows the marker (all of Level 2)
     restartReq: false,   // the language changed: the current step plays again (not the one before)
+    leverHelp: false,    // Level 3: the lever is on again after a wrong answer (counting help)
     labels: {}, ticks: {}, tticks: {},
     timers: { settle: null, idle: null, edge: null, pipeIn: null, pipeOut: null },
     resolveMarker: null, resolveEntry: null, resolveGate: null
@@ -628,7 +629,7 @@
       // He stands on the left, over what is NOT lit (the keypad side, blurred on the tank lines),
       // and points at what is. He stays while the learner plays: his bubble holds the
       // instruction, so the narrator box doesn't repeat it (2026-10-14 QA).
-      const landing = !el.stage.classList.contains("host");
+      const landing = !el.character.classList.contains("in");
       el.character.classList.add("in", "talk");
       el.stage.classList.add("host");               // one Guddu at a time: the narrator box steps aside
       setAvatar(mood);
@@ -644,6 +645,9 @@
     await Promise.all([speak(text), followChunks(text, ost)]);   // always plays to the end (no tap-to-skip)
     el.character.classList.remove("talk");
   }
+  /** The step opens with Guddu in full size (a guided lever line): his bubble is the first thing shown. */
+  const hostNext = (st) => !!st && !!st.guided && SPEAKERS[st.speaker || "guddu"].full &&
+    (st.type === "demo" ? st.act === "leverUpDown" || st.act === "leverMark" : !!st.lever);
   /** Guddu steps off (a line that isn't his to say in full size, a new screen). */
   function hostOut() {
     if (!el.stage.classList.contains("host") && !el.character.classList.contains("in")) return;
@@ -1162,7 +1166,9 @@
   }
   async function previewEntry() {
     if (!S.q || !S.q.autoLever || !S.padLive) return;
-    const L = typedLevel(), to = L === null ? S.q.start : L;
+    const L = typedLevel();
+    if (L === null && S.leverHelp) return;                 // counting with the lever: a half-typed answer doesn't move it back
+    const to = L === null ? S.q.start : L;
     const my = ++previewGen;
     while (S.level !== to && my === previewGen) {
       setLevel(S.level + Math.sign(to - S.level));     // level by level, with the water and its sound
@@ -1227,7 +1233,18 @@
     const fb = p.wrong[Math.min(S.wrong, p.wrong.length) - 1];
     await sayFocused(fb.text, "sad", fxArea(fb.fx));
     await runFx(fb.fx, q, fb);
-    setBanner(p.ost, "happy");
+    if (q.autoLever) {
+      // Level 3: the lever is off on the first try; after a wrong answer it comes back so the
+      // learner can count with it, and the hint stays as the instruction (2026-10-21 QA, Bug 7)
+      if (!S.leverHelp) {
+        S.leverHelp = true;
+        el.stage.classList.remove("lever-off");
+        setMarkerEnabled(true);
+        S.countFrom = q.start; render();
+        FX.flash(el.btnUp, "glow", 3000); FX.flash(el.btnDown, "glow", 3000);
+      }
+      setBanner(fb.text, "happy");
+    } else setBanner(p.ost, "happy");
     S.phase = "entry";
     setPadLive(true);
     resetIdle();
@@ -1373,6 +1390,7 @@
       if (step.section === "level3") el.eqPanel.classList.add("hidden");   // the Level 3 challenge appears at R5
       setSpeaker(step.speaker);
       setBanner(firstChunk(firstLine(step)), "happy");              // the next line is already up when the water drains
+      el.stage.classList.toggle("host", hostNext(step));         // (Guddu's line: the narrator box stays away)
     } });
   }
 
@@ -1499,6 +1517,11 @@
     await answered;
     S.resolveEntry = null;
     setPadLive(false);
+    if (S.leverHelp) {                                    // the lever is off again for the next question
+      S.leverHelp = false;
+      setMarkerEnabled(false);
+      el.stage.classList.add("lever-off");
+    }
     previewGen++;                                         // the answer is in: no more preview steps
     stopIdle();
     S.phase = "feedback";
@@ -1587,7 +1610,7 @@
         FX.sparkle(el.fx, LABEL_X, levelY(S.level), 12, 90);
         FX.badge(el.fx, pp.x + 250, pp.y, true);
         FX.sfx("correct");
-        await FX.sleep(1600);
+        await FX.sleep(2600);                            // the finished example stays up (QA Bug 5: it went by too fast)
         if (step.ostFirst) await narrate(step.vo, { speaker: step.speaker, pose: step.pose, look: "padTank" });   // a line after the tick (both stay lit)
         break;
       }
@@ -1747,8 +1770,9 @@
       left: (flip ? 1 - l - tw : l) * w + "px", top: t * h + "px", width: tw * w + "px", height: th * h + "px"
     });
     box.textContent = text;
-    // largest font that keeps the line inside the bubble (the bubble itself never changes size)
-    for (let fs = 50; fs >= 20; fs -= 2) {
+    // one size for every bubble, story and Guddu's (36 px, 2026-10-21 QA: the size changed from line
+    // to line); smaller only if a line would spill (none does: every bubble is wide enough)
+    for (let fs = 36; fs >= 20; fs -= 2) {
       box.style.fontSize = fs + "px";
       if (box.scrollHeight <= box.clientHeight + 1 && box.scrollWidth <= box.clientWidth + 1) break;
     }
@@ -1961,7 +1985,7 @@
         if (undo) S.floodBack = () => { go.onclick = null; S.floodBack = null; r("back"); };   // ⏮ (story)
       });
       if (choice === "back") undo();                                     // what was there comes back under the water
-    } else await FX.sleep(title ? 2000 : 450);
+    } else await FX.sleep(title ? 2500 : 450);
     if (title) { card.classList.replace("on", "away"); await FX.sleep(350); }   // the card floats off
     FX.sfxLoop("drain", 1200);
     FX.sfx("splashOut");
@@ -1982,6 +2006,7 @@
       tap: true,
       during: async () => {
         if (next) { setSpeaker(next.speaker); setBanner(firstChunk(firstLine(next)), "happy"); }   // the game's first line is already up
+        el.stage.classList.toggle("host", hostNext(next));      // … or, when Guddu says it, the narrator box stays away (no flash of it first: QA Bug 5)
         el.story.classList.add("hidden");
         el.shots.forEach((sh) => { sh.classList.remove("on"); sh.getAnimations().forEach((a) => a.cancel()); sh.style.transform = ""; });
       },
@@ -2427,7 +2452,7 @@
   }
 
   function init() {
-    window.__GAME_DEBUG = { renderEq, showTeachEq, fitEq, setBanner, el };   // automated layout checks (QA)
+    window.__GAME_DEBUG = { renderEq, showTeachEq, fitEq, setBanner, placeBubble, el };   // automated layout checks (QA)
     fitStage();
     buildScale();
     buildBubbles();

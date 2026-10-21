@@ -297,33 +297,40 @@ button { font-family: inherit; cursor: pointer; }
 #water.instant { transition: none; }
 /* Livelier water: light patterns drifting under the surface (brightest near the top) and a glint
    running along the surface. Both live inside #water, so they rise and fall with it. */
-#water .caustics {
+#water .caustics {         /* light patterns under the surface: two tiled layers that slide (transform only, so the GPU moves them: QA Bug 3) */
   position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none;
-  mix-blend-mode: screen; opacity: .38; filter: blur(1.5px);
-  background:
-    radial-gradient(closest-side, rgba(255, 255, 255, .7), rgba(255, 255, 255, 0)) 0 0 / 96px 44px,
-    radial-gradient(closest-side, rgba(200, 245, 255, .6), rgba(200, 245, 255, 0)) 40px 22px / 140px 64px;
+  mix-blend-mode: screen; opacity: .38;
   -webkit-mask-image: linear-gradient(180deg, #000 0, rgba(0,0,0,.5) 45%, transparent 90%); mask-image: linear-gradient(180deg, #000 0, rgba(0,0,0,.5) 45%, transparent 90%);
-  animation: caustics 9s linear infinite;
 }
+#water .caustics::before, #water .caustics::after {
+  content: ""; position: absolute; left: -160px; top: -160px; right: -160px; bottom: -160px; will-change: transform;
+}
+#water .caustics::before { background: radial-gradient(closest-side, rgba(255, 255, 255, .7), rgba(255, 255, 255, 0)) 0 0 / 96px 44px; animation: caustA 9s linear infinite; }
+#water .caustics::after { background: radial-gradient(closest-side, rgba(200, 245, 255, .6), rgba(200, 245, 255, 0)) 40px 22px / 140px 64px; animation: caustB 9s linear infinite; }
 #water .glint {
   position: absolute; left: 6px; right: 6px; top: -7px; height: 9px; border-radius: 6px; pointer-events: none;
-  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.95) 50%, rgba(255,255,255,0)) no-repeat 0 0 / 32% 100%;
-  filter: blur(1.2px); animation: glint 4.6s ease-in-out infinite;
+  overflow: hidden;
+}
+#water .glint::before {    /* the bright streak runs along the surface (transform only) */
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 32%; border-radius: 6px; will-change: transform;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.95) 50%, rgba(255,255,255,0));
+  animation: glint 4.6s ease-in-out infinite;
 }
 #water .ripple {           /* a ring spreading over the surface when the marker locks */
   position: absolute; left: 50%; top: -6px; width: 360px; height: 34px; margin: -17px 0 0 -180px; border-radius: 50%;
   border: 5px solid #fff; pointer-events: none; animation: lockRipple 1s ease-out forwards;
   box-shadow: 0 0 12px rgba(255, 255, 255, .9), inset 0 0 10px rgba(255, 255, 255, .7);
 }
-#water.sparkle .caustics { opacity: .8; animation-duration: 3s; }
+#water.sparkle .caustics { opacity: .8; }
+#water.sparkle .caustics::before, #water.sparkle .caustics::after { animation-duration: 3s; }
 #water.sparkle { filter: brightness(1.12) saturate(1.15); }
 .lab.lockpop { animation: labPop .7s var(--ease-spring); }
-@keyframes caustics { from { background-position: 0 0, 40px 22px; } to { background-position: 96px 88px, -100px 150px; } }
-@keyframes glint { 0% { background-position: -40% 0; } 60%, 100% { background-position: 140% 0; } }
+@keyframes caustA { from { transform: translate(0, 0); } to { transform: translate(96px, 88px); } }      /* whole tiles: the loop is seamless */
+@keyframes caustB { from { transform: translate(0, 0); } to { transform: translate(-140px, 128px); } }
+@keyframes glint { 0% { transform: translateX(-85%); } 60%, 100% { transform: translateX(298%); } }
 @keyframes lockRipple { from { transform: scale(.15); opacity: 1; } to { transform: scale(1.05); opacity: 0; } }
 @keyframes labPop { 0% { scale: 1; } 35% { scale: 1.55; } 100% { scale: 1; } }
-@media (prefers-reduced-motion: reduce) { #water .caustics, #water .glint { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #water .caustics::before, #water .caustics::after, #water .glint::before { animation: none; } }
 .wave {                    /* one wave length wider than the water and slid sideways (transform only: no repaint every frame) */
   --wl: 200px;
   left: 0; width: calc(100% + var(--wl)); height: 34px; top: -22px;
@@ -499,12 +506,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 #avatar.swap { animation: avatarBounce .5s var(--ease-spring); }
 #avatar.none { visibility: hidden; }            /* "Narrator:" lines have no face */
-#bannerText {
-  margin: 0; left: 83px; right: -18px; top: -48px; bottom: -48px;
-  display: flex; align-items: center; justify-content: center; text-align: center;   /* one or two lines, centred (QA Bug 13) */
+#bannerText {              /* the text starts at the same spot, on the left, for every line: one line or two (QA Bugs 4, 6) */
+  margin: 0; left: 92px; right: -14px; top: -48px; bottom: -48px;
+  padding-top: 30px;         /* = (box 138 − two lines of 38.4) / 2: two lines sit centred, one line on the first of them */
+  display: block; text-align: left;
   font-size: 32px; font-weight: 800; line-height: 1.2; color: var(--navy);
 }
-#bannerText { white-space: pre-line; text-wrap: balance; }
+#bannerText { white-space: pre-line; overflow: hidden; }
 
 /* Full-size Guddu, the game's host (guided steps): big, anchored in the bottom-left
    corner and cropped at the knees by the screen edge, so he never floats. He pops up
@@ -533,15 +541,15 @@ button { font-family: inherit; cursor: pointer; }
   50% { translate: 0 -6px; }
 }
 
-/* ---------------- Focus layer: frosted glass with spotlight holes ---------------- */
+/* ---------------- Focus layer: a dark tint with spotlight holes ---------------- */
 #focus {
   inset: 0; width: 1920px; height: 1080px;
   z-index: 40;
   background:
     linear-gradient(125deg, rgba(255,255,255,.10), rgba(255,255,255,0) 35%, rgba(255,255,255,.05) 70%, rgba(255,255,255,0)),
-    rgba(12, 26, 54, .36);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15) brightness(.8);
-          backdrop-filter: blur(10px) saturate(1.15) brightness(.8);
+    rgba(12, 26, 54, .55);
+  /* a dark tint, no backdrop blur: blurring the whole screen every frame held How to Play at ~25 fps
+     on slower laptops (measured: 25 fps → 61 fps; 2026-10-21 QA Bug 3). The spotlight reads the same. */
   opacity: 0; pointer-events: none;
   transition: opacity .45s ease, clip-path .65s var(--ease-out);
 }
@@ -561,7 +569,6 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 41; pointer-events: none; border-radius: 28px; opacity: 0; overflow: hidden;
   box-shadow: 0 0 36px 10px rgba(255, 214, 90, .30), 0 0 90px 30px rgba(255, 190, 60, .14);
   transition: left .65s var(--ease-out), top .65s var(--ease-out), width .65s var(--ease-out), height .65s var(--ease-out), opacity .4s;
-  animation: haloBreath 2.8s ease-in-out infinite;
 }
 .focus-ring.on { opacity: 1; }
 .focus-ring::after {
@@ -691,7 +698,7 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes coverBubble { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-560px); opacity: 0; } }
 @keyframes coverIn { from { opacity: 0; transform: translateY(40px) scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes coverPulse { 0%, 100% { scale: 1; } 50% { scale: 1.045; } }
-@keyframes coverSweep { 0%, 55% { left: -40%; } 100% { left: 120%; } }
+@keyframes coverSweep { 0%, 55% { transform: translateX(0) skewX(-18deg); } 100% { transform: translateX(533%) skewX(-18deg); } }
 @media (prefers-reduced-motion: reduce) { .cover-art, .cover-shine, .cover-btn, .cover-btn::after, .cover-bubbles span, .cover-title h1 { animation: none !important; } }
 .card {
   width: 980px; padding: 40px 60px 70px; text-align: center;
@@ -903,14 +910,14 @@ button { font-family: inherit; cursor: pointer; }
 #bubble img, #hostBubble img { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(0, 30, 70, .25)); }
 #bubble.flip img, #hostBubble.flip img { transform: scaleX(-1); }
 #hostBubble { z-index: 47; }                     /* above the frosted glass, beside Guddu's head */
-#bubbleText, #hostBubble p {
+#bubbleText, #hostBubble p {   /* the same face, weight and colour as the narrator box (QA Bug 14) */
   position: absolute; margin: 0; display: flex; align-items: center; justify-content: center;
-  text-align: center; font-weight: 900; line-height: 1.12; color: #111; overflow: hidden;
+  text-align: center; font-weight: 800; line-height: 1.2; color: var(--navy); overflow: hidden;
 }
 /* Narrator line: text straight on the scene (as dialogue_p01), with a soft light halo for legibility */
 #caption {
   position: absolute; left: 120px; right: 120px; top: 122px; margin: 0; text-align: center;   /* under the HUD row (⏸ ⏮ हिंदी ⏭ 🔊) */
-  font-size: 46px; font-weight: 700; line-height: 1.22; color: #111;
+  font-size: 46px; font-weight: 800; line-height: 1.2; color: var(--navy);
   text-shadow: 0 0 4px #fff, 0 0 10px rgba(255, 255, 255, .95), 0 0 22px rgba(255, 255, 255, .8), 0 0 36px rgba(255, 255, 255, .6);
   opacity: 0; transform: translateY(-12px); transition: opacity .5s, transform .5s var(--ease-out);
 }
@@ -920,8 +927,7 @@ button { font-family: inherit; cursor: pointer; }
 .hud-btn {
   z-index: 95; width: 76px; height: 76px; border-radius: 50%;
   border: 3px solid rgba(255,255,255,.85);
-  background: rgba(255,255,255,.28);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  background: rgba(255,255,255,.62);          /* solid, no backdrop blur: that was recomputed every frame over anything moving beneath (QA Bug 3) */
   font-size: 34px; box-shadow: 0 6px 16px rgba(0,0,0,.2);
 }
 #btnMute { left: 1824px; top: 22px; }
@@ -1101,12 +1107,8 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes lockFlash {
   0% { filter: none; } 30% { filter: brightness(1.8) drop-shadow(0 0 14px #fff); } 100% { filter: none; }
 }
-@keyframes haloBreath {
-  0%,100% { box-shadow: 0 0 30px 8px rgba(255, 214, 90, .26), 0 0 80px 24px rgba(255, 190, 60, .10); }
-  50%     { box-shadow: 0 0 46px 14px rgba(255, 214, 90, .42), 0 0 110px 38px rgba(255, 190, 60, .18); }
-}
-@keyframes lightSweep {
-  0% { left: -60%; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: 120%; opacity: 0; }
+@keyframes lightSweep {     /* across the box by transform (moving `left` re-laid the page out every frame) */
+  0% { transform: translateX(0) skewX(-12deg); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(400%) skewX(-12deg); opacity: 0; }
 }
 @keyframes avatarBounce { 0% { transform: scale(.7) rotate(-8deg); } 100% { transform: none; } }
 @keyframes talkBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }

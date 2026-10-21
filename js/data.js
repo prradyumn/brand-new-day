@@ -339,18 +339,18 @@ window.GAME_DATA = {
        +3 … −3 at y 310 / 400 / 482 / 553 / 653 / 743 / 842 (stage px). */
     { type: "scene", id: "Z2", section: "end", speaker: "pari", scene: "p11", fx: "celebrate",   // Guddu Bhaiya and Pari look at the completed scale. Confetti/sparkles.
       camera: { to: 1.04, x: 960, y: 560 },
-      bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
+      bubble: { shape: "round", tail: "left", w: 540, tip: [1450, 460] },   // (just below the top buttons)
       vo: "We did it! We tracked every rise and fall in the water level.",
       ost: "We did it! We tracked every rise and fall in the water level." },   // (sheet OST "Well Done!": removed, 2026-10-14 QA)
     { type: "scene", id: "Z3", section: "end", scene: "p11",                                    // Camera focuses on the full scale: negative numbers, 0, positive numbers.
       camera: { to: 1.08, x: 920, y: 575 },
       glow: [[918, 653], [918, 743], [918, 842], [925, 553], [920, 482], [920, 400], [920, 310]],
-      bubble: { shape: "wide", tail: "right", w: 440, tip: [420, 300] },
+      bubble: { shape: "round", tail: "right", w: 500, tip: [440, 380] },  // the round bubble left of Guddu: room for the line at 36 px
       vo: "And these positive numbers, negative numbers, and 0 are called integers.",
       ost: "And these positive numbers, negative numbers, and 0 are called integers." },
     { type: "scene", id: "Z4", section: "end", speaker: "pari", scene: "p11", sweep: true,      // The lever moves briefly from a negative number through 0 to a positive number.
       glow: [[918, 842], [918, 743], [918, 653], [925, 553], [920, 482], [920, 400], [920, 310]],
-      bubble: { shape: "round", tail: "left", w: 500, tip: [1450, 420] },
+      bubble: { shape: "round", tail: "left", w: 540, tip: [1450, 460] },
       vo: "So integers helped us show water levels below 0, at 0, and above 0!",   // number-line order, as the sheet OST (sheet VO: "at 0, above 0, and below 0")
       ost: "So integers helped us show water levels below 0, at 0, and above 0!" },
     { type: "scene", id: "Z5", section: "end", scene: "p12", fx: "badge",                       // Camera zooms out to the village and tank. Both wave. Completion badge.
