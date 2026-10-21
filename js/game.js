@@ -2474,6 +2474,7 @@
     setMarkerEnabled(false);
 
     $("btnStart").classList.remove("loading");
+    $("loadBar").classList.add("done");
     $("btnStart").disabled = false;
     prefetchVoice(START_INDEX);
     $("btnStart").addEventListener("click", () => {
@@ -2521,9 +2522,9 @@
   // then: the rest of the story, the game's own art (before the story ends), and the Story End last
   const LATER = [...new Set(INTRO.slice(2).concat(UI, SPRITES, ENDING))].filter((f) => !FIRST.includes(f));
   const loadImg = (src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => r(); i.src = src; });
-  // the Start button shows how much of the first screen has loaded
+  // a faint line along the bottom of the cover shows how much of the first screen has loaded
   let loaded = 0;
-  const loadedOne = () => { loaded++; $("btnStart").style.setProperty("--load", Math.round((loaded / FIRST.length) * 100) + "%"); };
+  const loadedOne = () => { loaded++; $("loadBar").style.setProperty("--load", (loaded / FIRST.length).toFixed(3)); };
   Promise.all(FIRST.map((src) => loadImg(src).then(loadedOne))).then(() => {
     init();
     // the rest, two at a time, in the order the game shows it (the game's own art comes before the story ends)
