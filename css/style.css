@@ -18,6 +18,7 @@
 
 * { box-sizing: border-box; }
 html:not(.fitted) #viewport { visibility: hidden; }   /* until the inline script in index.html has sized the stage: no zoomed-in flash (QA Bug 1) */
+html:not(.lang-ready) #viewport { visibility: hidden; }   /* until lang.js has put the page in its language: no English-then-Hindi flash on reload */
 html, body {
   margin: 0; height: 100%; overflow: hidden;
   background: #0d1a2e;

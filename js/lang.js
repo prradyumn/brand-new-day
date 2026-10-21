@@ -90,6 +90,7 @@
   try { if (!lang) lang = localStorage.getItem("lang"); } catch (e) {}
   if (!PACKS[lang]) lang = "en";
   apply(lang);
+  document.documentElement.classList.add("lang-ready");   // style.css keeps the page hidden until now (no flash of the other language on reload)
 
   const btn = document.getElementById("btnLang");
   if (btn) btn.addEventListener("pointerdown", (e) => {
