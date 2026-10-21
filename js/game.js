@@ -123,7 +123,7 @@
     gate: null,          // current transition step
     guided: false,       // spotlight/blur + character
     eqLive: false,       // the equation follows the marker (liveEq; off in every level since 2026-10-21)
-    ask: null,           // Level 2: the question, kept on the narrator box's first line until it is answered
+    ask: null,           // Levels 1–3: the question, kept on the narrator box's first line until it is answered
     restartReq: false,   // the language changed: the current step plays again (not the one before)
     leverHelp: false,    // Level 3: the lever is on again after a wrong answer (counting help)
     labels: {}, ticks: {}, tticks: {},
@@ -558,7 +558,7 @@
   }
   function setBanner(text, mood) {
     text = lastChunk(text);
-    if (S.ask) text = S.ask.includes(text) ? S.ask : S.ask + "\n" + text;   // Level 2: the question stays on top (2026-10-21)
+    if (S.ask) text = S.ask.includes(text) ? S.ask : S.ask + "\n" + text;   // Levels 1–3: the question stays on top (2026-10-21)
     const same = el.bannerText.textContent === text;
     el.bannerText.textContent = text;
     if (!same) fitText(el.bannerText, 32);                 // one size for every line (32 px); smaller only if it would spill (2026-10-19 QA: text jumped)
@@ -1461,13 +1461,15 @@
     markProgress(q.id, true);
   }
 
-  /** Level 2 (2026-10-21): the question, so the learner can recall it while answering: the
-      lever line without its last sentence, the instruction ("The water level rises 3 levels
-      up."). The narrator box shows it on top and the line that is up (instruction, hint,
-      reminder) under it, until the answer is entered. */
+  /** Levels 1–3 (2026-10-21): the question, so the learner can recall it while answering: the
+      question's first line without its last sentence, the instruction ("The water level rises
+      3 levels up."; Level 3: "The water level is at +4. It goes up 3 levels."). The narrator box
+      shows it on top and the line that is up (instruction, hint, reminder) under it, until the
+      answer is entered. Not in the guided tutorial ("Find the mark 0." is the whole question). */
   function askOf(q) {
-    if (q.section !== "level2" || !q.lever) return null;
-    const parts = q.lever.vo.replace(/\s*\n\s*/g, " ").split(/(?<=[.!?।])\s+/).map((t) => t.trim()).filter(Boolean);
+    const line = q.lever ? q.lever.vo : q.entry && q.entry.vo;
+    if (q.guided || !line || !/^level[123]$/.test(q.section)) return null;
+    const parts = line.replace(/\s*\n\s*/g, " ").split(/(?<=[.!?।])\s+/).map((t) => t.trim()).filter(Boolean);
     return parts.length > 1 ? parts.slice(0, -1).join(" ") : null;
   }
   /** Lever part: VO, the learner moves the marker, "Correct! You reached +2." */
@@ -1475,7 +1477,7 @@
     S.part = p; S.wrong = 0; S.area = "tank";
     await Promise.all([narrate(p.vo, { pose: p.pose, look: "tank", ost: p.ost }), S.eqBuild && buildQuestionEq(q, p.vo)]);
     S.eqBuild = false;
-    S.ask = askOf(q);                                    // Level 2: the question stays up until it is answered
+    S.ask = askOf(q);                                    // the question stays up until it is answered (Levels 1, 2)
     setBanner(p.ost, "happy");
     noteOst(p.vo, p.ost);
     focusOn("tank");
@@ -1520,6 +1522,7 @@
       await Promise.all([narrate(p.vo, { pose: p.pose, look: "pad", ost: p.ost }), S.eqBuild && buildQuestionEq(q, p.vo)]);   // Level 3: the keypad part is the only part
     else if (S.eqBuild) renderEq(q);
     S.eqBuild = false;
+    if (!S.ask) S.ask = askOf(q);                         // Level 3 (keypad only): the question stays up until it is answered
     setBanner(p.ost, "happy");
     noteOst(p.vo, p.ost);
     focusOn("pad");
