@@ -506,10 +506,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 #avatar.swap { animation: avatarBounce .5s var(--ease-spring); }
 #avatar.none { visibility: hidden; }            /* "Narrator:" lines have no face */
-#bannerText {              /* the text starts at the same spot, on the left, for every line: one line or two (QA Bugs 4, 6) */
+#bannerText {              /* left-aligned (QA Bugs 4, 6) and centred top to bottom: one line or two sit in the middle of the box */
   margin: 0; left: 92px; right: -14px; top: -48px; bottom: -48px;
-  padding-top: 30px;         /* = (box 138 − two lines of 38.4) / 2: two lines sit centred, one line on the first of them */
-  display: block; text-align: left;
+  display: flex; flex-direction: column; justify-content: safe center; text-align: left;   /* `safe`: text too tall spills down, so fitText can see it */
   font-size: 32px; font-weight: 800; line-height: 1.2; color: var(--navy);
 }
 #bannerText { white-space: pre-line; overflow: hidden; }
