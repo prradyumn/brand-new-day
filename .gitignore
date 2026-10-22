@@ -1,1 +1,7 @@
 .DS_Store
+# Not part of the game (kept on this machine only): design sources and the PNG/JPG originals
+# of the art. The game loads only the .webp copies.
+Integers_LBD_assets/
+assets/**/*.png
+assets/**/*.jpg
+.vscode/
