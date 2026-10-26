@@ -2115,7 +2115,7 @@
   // "Learner observes and taps to continue." — a tap anywhere on the game, including
   // the keypad (capture phase, before the keys stop the event); HUD/QA controls excluded
   el.stage.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("#btnMute, #btnJump, #btnBack, #btnStoryBack, #btnPause, #btnLang, #review, #jumper, #paused")) return;
+    if (e.target.closest("#btnMute, #btnJump, #btnBack, #btnStoryBack, #btnPause, #btnLang, #langMenu, #review, #jumper, #paused")) return;
     if (S.phase === "gate" && S.gate && S.gate.continueOnTap && S.resolveGate) { FX.sfx("button"); S.resolveGate(); }
   }, true);
 
@@ -2544,7 +2544,7 @@
   // a faint line along the bottom of the cover shows how much of the first screen has loaded
   let loaded = 0;
   const loadedOne = () => { loaded++; $("loadBar").style.setProperty("--load", (loaded / FIRST.length).toFixed(3)); };
-  Promise.all(FIRST.map((src) => loadImg(src).then(loadedOne))).then(() => {
+  Promise.all(FIRST.map((src) => loadImg(src).then(loadedOne)).concat(window.I18N && I18N.ready)).then(() => {   // (and the language's lines: lang/*.json)
     init();
     // the rest, two at a time, in the order the game shows it (the game's own art comes before the story ends)
     const queue = LATER.slice();

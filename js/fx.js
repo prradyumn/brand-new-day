@@ -214,7 +214,7 @@
       };
       muteHooks.add(onMute);
 
-      if (FX.muted) { readFallback(); return; }
+      if (FX.muted || window.LANG_TEXT_ONLY) { readFallback(); return; }   // (text-only languages: no voice, js/lang.js)
 
       /* ---- Recorded clip ---- */
       const clip = FX.clipFor(text, opts.speaker);
@@ -367,7 +367,7 @@
       else the browser voice. Nothing waits on it; FX.previewStop() silences it. */
   FX.preview = (text, speaker) => {
     FX.previewStop();
-    if (FX.muted || !held) return;
+    if (FX.muted || !held || window.LANG_TEXT_ONLY) return;
     const clip = FX.clipFor(text, speaker);
     if (clip) {
       voEl.src = clip;
